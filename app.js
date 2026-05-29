@@ -42,7 +42,20 @@ function loadUserSettings(username) {
     const raw = localStorage.getItem(getSettingsKey(username));
     if (!raw) return structuredClone(DEFAULT_SETTINGS);
     try {
-        return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+        const parsed = JSON.parse(raw);
+        const merged = structuredClone(DEFAULT_SETTINGS);
+
+        if (parsed.cards) {
+            for (const k of Object.keys(merged.cards)) {
+                if (k in parsed.cards) merged.cards[k] = parsed.cards[k];
+            }
+        }
+        if (parsed.thresholds && parsed.thresholds.reputation) {
+            const t = parsed.thresholds.reputation;
+            if (typeof t.red === "number") merged.thresholds.reputation.red = t.red;
+            if (typeof t.orange === "number") merged.thresholds.reputation.orange = t.orange;
+        }
+        return merged;
     } catch {
         return structuredClone(DEFAULT_SETTINGS);
     }
@@ -377,6 +390,14 @@ async function keychainLogin() {
         return;
     }
 
+    const usernameInput = document.getElementById("loginUsername");
+    if (!usernameInput || !usernameInput.value.trim()) {
+        alert("Please enter your Hive username before logging in.");
+        return;
+    }
+
+    const username = usernameInput.value.trim().toLowerCase();
+
     try {
         // 1. Handshake
         await new Promise((resolve, reject) => {
@@ -386,13 +407,13 @@ async function keychainLogin() {
             });
         });
 
-        // 2. Random nonce
+        // 2. Nonce
         const nonce = `HiveHealthLogin-${Date.now()}-${Math.random()}`;
 
-        // 3. SignBuffer
+        // 3. SignBuffer (username is verplicht!)
         const signRes = await new Promise((resolve, reject) => {
             hive_keychain.requestSignBuffer(
-                null,
+                username,
                 nonce,
                 "Posting",
                 res => {
@@ -402,27 +423,22 @@ async function keychainLogin() {
             );
         });
 
-        // 4. Extract username from ANY Keychain version
-        const username =
+        // 4. Username ophalen uit ALLE Keychain varianten
+        const returnedUser =
             signRes?.data?.username ||
             signRes?.result?.username ||
             signRes?.username ||
             signRes?.msg?.username ||
-            null;
+            signRes?.request?.username ||
+            signRes?.payload?.username ||
+            username;
 
-        if (!username) {
-            console.error("Keychain response:", signRes);
-            throw new Error("No username returned by Keychain");
-        }
-
-        // 5. Set login state
-        loggedInUser = username;
+        loggedInUser = returnedUser;
         currentUserSettings = loadUserSettings(loggedInUser);
 
         renderTopBar();
         applySettingsToDashboard();
 
-        // 6. Log to Discord
         await logLogin(loggedInUser);
 
     } catch (e) {
@@ -442,25 +458,25 @@ function logoutUser() {
 }
 
 // ----------------------------------------------------
-// TOP BAR RENDER
+// TOP BAR RENDER (MINIMALISTISCH)
 // ----------------------------------------------------
 function renderTopBar() {
     const el = document.getElementById("topBar");
     if (!el) return;
 
-    const userLabel = loggedInUser
+    const userPart = loggedInUser
         ? `<span class="topbar-user">👤 ${loggedInUser}</span>`
-        : `<span class="topbar-user topbar-user-guest">Guest</span>`;
+        : `<input id="loginUsername" class="topbar-input" placeholder="username">`;
 
     const loginBtn = !loggedInUser
         ? `<button id="loginBtn" class="topbar-btn">Login</button>`
-        : `<button id="logoutBtn" class="topbar-btn">⎋</button>`;
+        : `<button id="logoutBtn" class="topbar-btn" title="Logout">⎋</button>`;
 
-    const settingsBtn = `<button id="settingsBtn" class="topbar-btn">⚙️</button>`;
+    const settingsBtn = `<button id="settingsBtn" class="topbar-btn" title="Settings">⚙️</button>`;
 
     el.innerHTML = `
         <div class="topbar-inner">
-            ${userLabel}
+            ${userPart}
             <div class="topbar-actions">
                 ${settingsBtn}
                 ${loginBtn}
