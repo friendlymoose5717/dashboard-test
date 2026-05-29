@@ -39,6 +39,24 @@ const TOOLTIPS = {
 };
 
 // ----------------------------------------------------
+// SETTINGS LABELS (NIEUW)
+// ----------------------------------------------------
+const BLOCK_LABELS = {
+    repCard: "Reputation",
+    ageCard: "Account age (days)",
+    hpCard: "Active HP",
+    delegationPctCard: "Delegation %",
+    keCard: "KE (Rewards/Stake Co-efficient)",
+    postsCard: "Posts (7d)",
+    commentsCard: "Comments (7d)",
+    ratioCard: "Comment/Post ratio",
+    transfersCard: "Outgoing transfers (30d)",
+    downvotesCard: "Incoming downvotes (30d)",
+    uniqueUpvotesCard: "Unique author upvotes (30d)",
+    blacklistCard: "Hivewatchers blacklist"
+};
+
+// ----------------------------------------------------
 // HELPERS
 // ----------------------------------------------------
 const api = (method, params = []) =>
@@ -76,6 +94,7 @@ const BLOCKS = [
     "keCard", "postsCard", "commentsCard", "ratioCard",
     "transfersCard", "downvotesCard", "uniqueUpvotesCard", "blacklistCard"
 ];
+
 // ----------------------------------------------------
 // KEYCHAIN LOGIN
 // ----------------------------------------------------
@@ -140,156 +159,181 @@ async function loadUserPreferences() {
         }
     }
 }
-
 // ----------------------------------------------------
-// SAVE USER PREFERENCES TO CHAIN
+// ACCOUNT DATA
 // ----------------------------------------------------
-async function saveUserPreferences() {
-    if (!loggedInUser) {
-        alert("Settings can only be saved when logged in with your Hive account.");
-        return;
-    }
+const getAccount = u =>
+    api("condenser_api.get_accounts", [[u]]).then(r => r?.[0] || null);
 
-    const json = {
-        app: "hive-account-health-dashboard",
-        prefs: userPreferences
-    };
+const getReputation = u =>
+    api("bridge.get_profile", [{ account: u }]).then(r => r?.reputation || 0);
 
-    hive_keychain.requestCustomJson(
-        loggedInUser,
-        "hive-dashboard-prefs",
-        "Posting",
-        JSON.stringify(json),
-        "Save dashboard preferences",
-        (res) => {
-            if (!res.success) {
-                alert("Failed to save preferences.");
-            }
-        }
-    );
-}
-
-// ----------------------------------------------------
-// SETTINGS PANEL RENDER
-// ----------------------------------------------------
-function renderSettingsPanel() {
-    const panel = document.getElementById("settingsPanel");
-    const content = document.getElementById("settingsContent");
-
-    panel.style.display = "block";
-
-    if (!loggedInUser) {
-        content.innerHTML = `<p>Settings can only be saved when logged in with your Hive account.</p>`;
-        return;
-    }
-
-    content.innerHTML = BLOCKS.map(id => `
-        <label style="display:block; margin:6px 0;">
-            <input type="checkbox" data-block="${id}"
-                ${!userPreferences.hiddenBlocks.includes(id) ? "checked" : ""}>
-            ${id}
-        </label>
-    `).join("");
-
-    content.querySelectorAll("input").forEach(chk => {
-        chk.addEventListener("change", () => {
-            const id = chk.dataset.block;
-            if (!chk.checked) {
-                if (!userPreferences.hiddenBlocks.includes(id))
-                    userPreferences.hiddenBlocks.push(id);
-            } else {
-                userPreferences.hiddenBlocks =
-                    userPreferences.hiddenBlocks.filter(x => x !== id);
-            }
-            applyBlockVisibility();
-        });
-    });
-
-    applyBlockVisibility();
-}
-
-// ----------------------------------------------------
-// APPLY VISIBILITY
-// ----------------------------------------------------
-function applyBlockVisibility() {
-    for (const id of BLOCKS) {
-        const el = document.getElementById(id);
-        if (!el) continue;
-
-        el.style.display = userPreferences.hiddenBlocks.includes(id)
-            ? "none"
-            : "block";
-    }
-}
-
-// ----------------------------------------------------
-// OUTGOING DELEGATIONS
-// ----------------------------------------------------
-async function getOutgoingDelegations(user) {
-    const delegs = await api("condenser_api.get_vesting_delegations", [user, "", 1000]);
+async function getHP(acc) {
     const g = await loadGlobals();
     const fund = parseFloat(g.total_vesting_fund_hive);
     const shares = parseFloat(g.total_vesting_shares);
 
-    return delegs.map(d => ({
-        to: d.delegatee,
-        hp: parseFloat(d.vesting_shares) * (fund / shares)
-    }));
+    const vs = parseFloat(acc.vesting_shares);
+    const rs = parseFloat(acc.received_vesting_shares);
+    const ds = parseFloat(acc.delegated_vesting_shares);
+
+    return (vs + rs - ds) * (fund / shares);
 }
 
-function applyTooltips() {
-    for (const [id, text] of Object.entries(TOOLTIPS)) {
-        const el = document.getElementById(id);
-        if (el) el.setAttribute("title", text);
+async function getDelegatedHP(acc) {
+    const g = await loadGlobals();
+    const fund = parseFloat(g.total_vesting_fund_hive);
+    const shares = parseFloat(g.total_vesting_shares);
+    const ds = parseFloat(acc.delegated_vesting_shares);
+    return ds * (fund / shares);
+}
+
+// ----------------------------------------------------
+// HISTORY (30 DAYS)
+// ----------------------------------------------------
+async function getHistory30d(user) {
+    const limit = 1000;
+    let from = -1;
+    const cutoff = daysAgo(30);
+    const all = [];
+
+    while (true) {
+        const batch = await api("condenser_api.get_account_history", [user, from, limit]);
+        if (!batch?.length) break;
+
+        for (const h of batch) {
+            const ts = new Date(h[1].timestamp).getTime();
+            if (ts < cutoff) return all;
+            all.push(h);
+        }
+        from = batch[0][0] - 1;
     }
+    return all;
 }
 
 // ----------------------------------------------------
-// LOGGING
+// METRICS
 // ----------------------------------------------------
-async function logSearch(username) {
-    const payload = {
-        content: `🔍 Search: **${username}**\n🆔 Anonymous ID: \`${anonId()}\``
-    };
+function postsComments7d(history, user) {
+    const cutoff = daysAgo(7);
+    let posts = 0, comments = 0;
+    const seenPermlinks = new Set();
 
-    try {
-        await fetch(
-            "https://discord.com/api/webhooks/1506564033141018674/p0rGAjrficEBUJ0v1jobUQXeyO8FL3gIU8roaMcDIH3QlmGl3gMKUutuV38FlwSB3kIR",
-            {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            }
-        );
-    } catch (e) {
-        console.error("Webhook error:", e);
+    for (const h of history) {
+        const op = h[1].op;
+        if (!op || op[0] !== "comment") continue;
+
+        const c = op[1];
+        if (c.author.toLowerCase() !== user) continue;
+
+        const ts = new Date(h[1].timestamp).getTime();
+        if (ts < cutoff) continue;
+
+        if (seenPermlinks.has(c.permlink)) continue;
+        seenPermlinks.add(c.permlink);
+
+        const isPost =
+            c.parent_author === "" &&
+            c.title.trim().length > 0 &&
+            !c.permlink.startsWith("re-");
+
+        if (isPost) posts++;
+        else comments++;
     }
+
+    return { posts, comments, ratio: posts ? comments / posts : 0 };
 }
 
-const throttle = () => {
-    const now = Date.now();
-    if (now - lastSearch < 1500) return false;
-    lastSearch = now;
-    return true;
-};
+function downvotes(history, user) {
+    const cutoff = daysAgo(30);
+    const map = {};
 
-// ----------------------------------------------------
-// LOADERS
-// ----------------------------------------------------
-async function loadGlobals() {
-    if (globals) return globals;
-    globals = await api("condenser_api.get_dynamic_global_properties");
-    return globals;
-}
+    for (const h of history) {
+        const op = h[1].op;
+        if (!op || op[0] !== "vote") continue;
 
-async function loadBlacklist() {
-    try {
-        const res = await fetch("https://spaminator.me/api/bl/all.json");
-        const data = await res.json();
-        blacklist = new Set(data.result || []);
-    } catch (e) {
-        console.error("Blacklist load error:", e);
+        const v = op[1];
+        const ts = new Date(h[1].timestamp).getTime();
+        if (ts < cutoff) continue;
+
+        if (v.weight < 0 && v.author.toLowerCase() === user) {
+            map[v.voter] = (map[v.voter] || 0) + 1;
+        }
     }
+    return map;
+}
+
+// ----------------------------------------------------
+// UNIQUE AUTHOR UPVOTES (30 DAYS)
+// ----------------------------------------------------
+function uniqueUpvotedAuthors(history, user) {
+    const cutoff = daysAgo(30);
+    const authors = new Set();
+
+    for (const h of history) {
+        const op = h[1].op;
+        if (!op || op[0] !== "vote") continue;
+
+        const v = op[1];
+        const ts = new Date(h[1].timestamp).getTime();
+        if (ts < cutoff) continue;
+
+        if (!v.author || v.author.trim() === "") continue;
+
+        if (v.voter.toLowerCase() === user && v.weight > 0) {
+            authors.add(v.author.toLowerCase());
+        }
+    }
+
+    return authors.size;
+}
+
+// ----------------------------------------------------
+// TRANSFERS
+// ----------------------------------------------------
+function outgoingTransfers(history, user) {
+    return history
+        .filter(h => h[1].op[0] === "transfer")
+        .map(h => h[1].op[1])
+        .filter(t => t.from.toLowerCase() === user);
+}
+
+function summarizeTransfers(list) {
+    let hive = 0, hbd = 0;
+    const perUser = {};
+
+    for (const t of list) {
+        const [amt, cur] = t.amount.split(" ");
+        const v = parseFloat(amt);
+
+        if (cur === "HIVE") hive += v;
+        if (cur === "HBD") hbd += v;
+
+        if (!perUser[t.to]) perUser[t.to] = { hive: 0, hbd: 0 };
+        if (cur === "HIVE") perUser[t.to].hive += v;
+        if (cur === "HBD") perUser[t.to].hbd += v;
+    }
+    return { hive, hbd, perUser };
+}
+
+// ----------------------------------------------------
+// KE — KRAMPUS EFFICIENCY
+// ----------------------------------------------------
+async function computeKE(acc) {
+    const g = await loadGlobals();
+
+    const authorRewards = acc.posting_rewards / 1000;
+    const curationRewards = acc.curation_rewards / 1000;
+
+    const fund = parseFloat(g.total_vesting_fund_hive);
+    const shares = parseFloat(g.total_vesting_shares);
+    const vesting = parseFloat(acc.vesting_shares);
+
+    const hpBalance = shares ? (fund * vesting) / shares : 0;
+
+    const krampus = hpBalance ? (authorRewards + curationRewards) / hpBalance : -1;
+
+    return { authorRewards, curationRewards, hpBalance, krampus };
 }
 // ----------------------------------------------------
 // ACCOUNT DATA
