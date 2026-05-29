@@ -438,6 +438,66 @@ async function keychainLogin() {
     }
 
     try {
+        // 1. Handshake
+        await new Promise((resolve, reject) => {
+            hive_keychain.requestHandshake(res => {
+                if (res && res.success) resolve(res);
+                else reject(new Error("Handshake failed"));
+            });
+        });
+
+        // 2. Random nonce
+        const nonce = `HiveHealthLogin-${Date.now()}-${Math.random()}`;
+
+        // 3. SignBuffer
+        const signRes = await new Promise((resolve, reject) => {
+            hive_keychain.requestSignBuffer(
+                null,
+                nonce,
+                "Posting",
+                res => {
+                    if (res && res.success) resolve(res);
+                    else reject(new Error("SignBuffer failed"));
+                }
+            );
+        });
+
+        // 4. Extract username from ANY Keychain version
+        const username =
+            signRes?.data?.username ||
+            signRes?.result?.username ||
+            signRes?.username ||
+            signRes?.msg?.username || // fallback for older builds
+            null;
+
+        if (!username) {
+            console.error("Keychain response:", signRes);
+            throw new Error("No username returned by Keychain");
+        }
+
+        // 5. Set login state
+        loggedInUser = username;
+        currentUserSettings = loadUserSettings(loggedInUser);
+
+        renderTopBar();
+        applySettingsToDashboard();
+
+        // 6. Log to Discord
+        await logLogin(loggedInUser);
+
+    } catch (e) {
+        console.error("Keychain login error:", e);
+        alert("Login failed or was cancelled.");
+    }
+}
+
+
+    if (!window.hive_keychain) {
+        alert("Hive Keychain extension not detected.");
+        return;
+    }
+
+    try {
         await new Promise((resolve, reject) => {
             window.hive_keychain.requestHandshake(res => {
                 if (res && res.success) resolve(res);
