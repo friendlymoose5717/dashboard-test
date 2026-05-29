@@ -5,13 +5,12 @@ let blacklist = new Set();
 let globals = null;
 let lastSearch = 0;
 
-// Logged-in user (Hive Keychain)
+// ----------------------------------------------------
+// LOGIN + SETTINGS GLOBALS
+// ----------------------------------------------------
 let loggedInUser = null;
-
-// Per-user settings (loaded from localStorage)
 let currentUserSettings = null;
 
-// Default settings
 const DEFAULT_SETTINGS = {
     cards: {
         repCard: true,
@@ -35,7 +34,27 @@ const DEFAULT_SETTINGS = {
     }
 };
 
-// Exchange accounts
+function getSettingsKey(username) {
+    return `hive_health_settings_${username}`;
+}
+
+function loadUserSettings(username) {
+    const raw = localStorage.getItem(getSettingsKey(username));
+    if (!raw) return structuredClone(DEFAULT_SETTINGS);
+    try {
+        return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+    } catch {
+        return structuredClone(DEFAULT_SETTINGS);
+    }
+}
+
+function saveUserSettings(username, settings) {
+    localStorage.setItem(getSettingsKey(username), JSON.stringify(settings));
+}
+
+// ----------------------------------------------------
+// EXCHANGE ACCOUNTS
+// ----------------------------------------------------
 const EXCHANGES = new Set([
     "deepcrypto8","binance-hot","poloniex","bittrex","upbitsteem",
     "hot.dunamu","hot1.dunamu","hot2.dunamu","hot3.dunamu","hot4.dunamu","hot5.dunamu",
@@ -52,7 +71,9 @@ const SWAP_DEX = new Set([
     "market.backup", "swaplane", "swaplane2", "quikswap", "happycustomer"
 ]);
 
-// Tooltips
+// ----------------------------------------------------
+// TOOLTIP DEFINITIONS
+// ----------------------------------------------------
 const TOOLTIPS = {
   repCard: "Reputation score based on upvotes received.",
   ageCard: "Number of days since the account was created.",
@@ -87,6 +108,13 @@ const setCard = (id, value, status) => {
     el.className = "card " + status;
 };
 
+function applyTooltips() {
+    for (const [id, text] of Object.entries(TOOLTIPS)) {
+        const el = document.getElementById(id);
+        if (el) el.setAttribute("title", text);
+    }
+}
+
 const anonId = () => {
     let id = localStorage.getItem("anon_id");
     if (!id) {
@@ -95,66 +123,6 @@ const anonId = () => {
     }
     return id;
 };
-
-function applyTooltips() {
-    for (const [id, text] of Object.entries(TOOLTIPS)) {
-        const el = document.getElementById(id);
-        if (el) el.setAttribute("title", text);
-    }
-}
-
-// ----------------------------------------------------
-// SETTINGS STORAGE
-// ----------------------------------------------------
-function getSettingsKey(username) {
-    return `hive_health_settings_${username}`;
-}
-
-function loadUserSettings(username) {
-    const key = getSettingsKey(username);
-    const raw = localStorage.getItem(key);
-    if (!raw) return structuredClone(DEFAULT_SETTINGS);
-
-    try {
-        const parsed = JSON.parse(raw);
-        // Merge with defaults to avoid missing keys
-        const merged = structuredClone(DEFAULT_SETTINGS);
-
-        if (parsed.cards) {
-            for (const k of Object.keys(merged.cards)) {
-                if (k in parsed.cards) merged.cards[k] = parsed.cards[k];
-            }
-        }
-        if (parsed.thresholds && parsed.thresholds.reputation) {
-            const t = parsed.thresholds.reputation;
-            if (typeof t.red === "number") merged.thresholds.reputation.red = t.red;
-            if (typeof t.orange === "number") merged.thresholds.reputation.orange = t.orange;
-        }
-        return merged;
-    } catch {
-        return structuredClone(DEFAULT_SETTINGS);
-    }
-}
-
-function saveUserSettings(username, settings) {
-    const key = getSettingsKey(username);
-    localStorage.setItem(key, JSON.stringify(settings));
-}
-
-// ----------------------------------------------------
-// OUTGOING DELEGATIONS
-// ----------------------------------------------------
-async function getOutgoingDelegations(user) {
-    const delegs = await api("condenser_api.get_vesting_delegations", [user, "", 1000]);
-    const g = await loadGlobals();
-    const fund = parseFloat(g.total_vesting_fund_hive);
-    const shares = parseFloat(g.total_vesting_shares);
-
-    return delegs.map(d => ({
-        to: d.delegatee,
-        hp: parseFloat(d.vesting_shares) * (fund / shares)
-    }));
-}
 
 // ----------------------------------------------------
 // LOGGING
@@ -225,8 +193,11 @@ async function loadBlacklist() {
 // ----------------------------------------------------
 // ACCOUNT DATA
 // ----------------------------------------------------
-const getAccount = u => api("condenser_api.get_accounts", [[u]]).then(r => r?.[0] || null);
-const getReputation = u => api("bridge.get_profile", [{ account: u }]).then(r => r?.reputation || 0);
+const getAccount = u =>
+    api("condenser_api.get_accounts", [[u]]).then(r => r?.[0] || null);
+
+const getReputation = u =>
+    api("bridge.get_profile", [{ account: u }]).then(r => r?.reputation || 0);
 
 async function getHP(acc) {
     const g = await loadGlobals();
@@ -391,46 +362,15 @@ async function computeKE(acc) {
 
     const hpBalance = shares ? (fund * vesting) / shares : 0;
 
-    const krampus = hpBalance ? (authorRewards + curationRewards) / hpBalance : -1;
+    const krampus = hpBalance
+        ? (authorRewards + curationRewards) / hpBalance
+        : -1;
 
     return { authorRewards, curationRewards, hpBalance, krampus };
 }
 // ----------------------------------------------------
 // HIVE KEYCHAIN LOGIN (HANDSHAKE + SIGNBUFFER)
 // ----------------------------------------------------
-function renderTopBar() {
-    const el = document.getElementById("topBar");
-    if (!el) return;
-
-    const userLabel = loggedInUser
-        ? `<span class="topbar-user">👤 ${loggedInUser}</span>`
-        : `<span class="topbar-user topbar-user-guest">Guest</span>`;
-
-    const loginBtn = !loggedInUser
-        ? `<button id="loginBtn" class="topbar-btn" title="Login with Hive Keychain">Login</button>`
-        : `<button id="logoutBtn" class="topbar-btn" title="Logout">⎋</button>`;
-
-    const settingsBtn = `<button id="settingsBtn" class="topbar-btn" title="Settings">⚙️</button>`;
-
-    el.innerHTML = `
-        <div class="topbar-inner">
-            ${userLabel}
-            <div class="topbar-actions">
-                ${settingsBtn}
-                ${loginBtn}
-            </div>
-        </div>
-    `;
-
-    const lb = document.getElementById("loginBtn");
-    const lo = document.getElementById("logoutBtn");
-    const sb = document.getElementById("settingsBtn");
-
-    if (lb) lb.addEventListener("click", keychainLogin);
-    if (lo) lo.addEventListener("click", logoutUser);
-    if (sb) sb.addEventListener("click", onSettingsClick);
-}
-
 async function keychainLogin() {
     if (!window.hive_keychain) {
         alert("Hive Keychain extension not detected.");
@@ -467,7 +407,7 @@ async function keychainLogin() {
             signRes?.data?.username ||
             signRes?.result?.username ||
             signRes?.username ||
-            signRes?.msg?.username || // fallback for older builds
+            signRes?.msg?.username ||
             null;
 
         if (!username) {
@@ -491,56 +431,50 @@ async function keychainLogin() {
     }
 }
 
-
-    if (!window.hive_keychain) {
-        alert("Hive Keychain extension not detected.");
-        return;
-    }
-
-    try {
-        await new Promise((resolve, reject) => {
-            window.hive_keychain.requestHandshake(res => {
-                if (res && res.success) resolve(res);
-                else reject(new Error("Handshake failed"));
-            });
-        });
-
-        const nonce = `HiveHealthLogin-${Date.now()}-${Math.random()}`;
-
-        const signRes = await new Promise((resolve, reject) => {
-            window.hive_keychain.requestSignBuffer(
-                null,
-                nonce,
-                "Posting",
-                res => {
-                    if (res && res.success) resolve(res);
-                    else reject(new Error("SignBuffer failed"));
-                }
-            );
-        });
-
-        const username = signRes.data && signRes.data.username
-            ? signRes.data.username
-            : signRes.username || null;
-
-        if (!username) throw new Error("No username returned from Keychain");
-
-        loggedInUser = username;
-        currentUserSettings = loadUserSettings(loggedInUser);
-        renderTopBar();
-        applySettingsToDashboard();
-        await logLogin(loggedInUser);
-    } catch (e) {
-        console.error("Keychain login error:", e);
-        alert("Login failed or was cancelled.");
-    }
-}
-
+// ----------------------------------------------------
+// LOGOUT
+// ----------------------------------------------------
 function logoutUser() {
     loggedInUser = null;
     currentUserSettings = null;
     renderTopBar();
     applySettingsToDashboard();
+}
+
+// ----------------------------------------------------
+// TOP BAR RENDER
+// ----------------------------------------------------
+function renderTopBar() {
+    const el = document.getElementById("topBar");
+    if (!el) return;
+
+    const userLabel = loggedInUser
+        ? `<span class="topbar-user">👤 ${loggedInUser}</span>`
+        : `<span class="topbar-user topbar-user-guest">Guest</span>`;
+
+    const loginBtn = !loggedInUser
+        ? `<button id="loginBtn" class="topbar-btn">Login</button>`
+        : `<button id="logoutBtn" class="topbar-btn">⎋</button>`;
+
+    const settingsBtn = `<button id="settingsBtn" class="topbar-btn">⚙️</button>`;
+
+    el.innerHTML = `
+        <div class="topbar-inner">
+            ${userLabel}
+            <div class="topbar-actions">
+                ${settingsBtn}
+                ${loginBtn}
+            </div>
+        </div>
+    `;
+
+    if (document.getElementById("loginBtn"))
+        document.getElementById("loginBtn").addEventListener("click", keychainLogin);
+
+    if (document.getElementById("logoutBtn"))
+        document.getElementById("logoutBtn").addEventListener("click", logoutUser);
+
+    document.getElementById("settingsBtn").addEventListener("click", onSettingsClick);
 }
 
 // ----------------------------------------------------
@@ -562,62 +496,58 @@ function onSettingsClick() {
         alert("Settings can only be stored when you are logged in.");
         return;
     }
-    if (!currentUserSettings) {
+    if (!currentUserSettings)
         currentUserSettings = loadUserSettings(loggedInUser);
-    }
+
     const panel = ensureSettingsPanel();
     buildSettingsPanel(panel);
     panel.classList.toggle("hidden");
 }
 
 function buildSettingsPanel(panel) {
-    const s = currentUserSettings || DEFAULT_SETTINGS;
+    const s = currentUserSettings;
 
     const cardRows = [
         { id: "repCard", label: "Reputation" },
         { id: "ageCard", label: "Account age" },
         { id: "hpCard", label: "Active HP" },
         { id: "delegationPctCard", label: "Delegation %" },
-        { id: "keCard", label: "KE (Rewards/Stake)" },
+        { id: "keCard", label: "KE" },
         { id: "postsCard", label: "Posts (7d)" },
         { id: "commentsCard", label: "Comments (7d)" },
         { id: "ratioCard", label: "Comment/Post ratio" },
-        { id: "transfersCard", label: "Outgoing transfers (30d)" },
-        { id: "downvotesCard", label: "Incoming downvotes (30d)" },
-        { id: "uniqueUpvotesCard", label: "Unique author upvotes (30d)" },
-        { id: "blacklistCard", label: "Hivewatchers blacklist" }
+        { id: "transfersCard", label: "Transfers (30d)" },
+        { id: "downvotesCard", label: "Downvotes (30d)" },
+        { id: "uniqueUpvotesCard", label: "Unique upvotes" },
+        { id: "blacklistCard", label: "Blacklist" }
     ];
-
-    const repRed = s.thresholds.reputation.red;
-    const repOrange = s.thresholds.reputation.orange;
 
     panel.innerHTML = `
         <div class="settings-header">
             <span>Dashboard settings</span>
             <button id="settingsCloseBtn" class="settings-close">✕</button>
         </div>
+
         <div class="settings-body">
             <h4>Cards</h4>
-            <div class="settings-list">
-                ${cardRows.map(row => `
-                    <div class="settings-row">
-                        <span>${row.label}</span>
-                        <label class="switch">
-                            <input type="checkbox" data-card-id="${row.id}" ${s.cards[row.id] ? "checked" : ""}>
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                `).join("")}
-            </div>
+            ${cardRows.map(row => `
+                <div class="settings-row">
+                    <span>${row.label}</span>
+                    <label class="switch">
+                        <input type="checkbox" data-card-id="${row.id}" ${s.cards[row.id] ? "checked" : ""}>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            `).join("")}
 
             <h4>Reputation thresholds</h4>
-            <div class="settings-row thresholds-row">
+            <div class="settings-row">
                 <span>Red</span>
-                <input type="number" id="repRedInput" value="${repRed}" />
+                <input type="number" id="repRedInput" value="${s.thresholds.reputation.red}">
             </div>
-            <div class="settings-row thresholds-row">
+            <div class="settings-row">
                 <span>Orange</span>
-                <input type="number" id="repOrangeInput" value="${repOrange}" />
+                <input type="number" id="repOrangeInput" value="${s.thresholds.reputation.orange}">
             </div>
         </div>
     `;
@@ -625,35 +555,25 @@ function buildSettingsPanel(panel) {
     document.getElementById("settingsCloseBtn")
         .addEventListener("click", () => panel.classList.add("hidden"));
 
-    panel.querySelectorAll("input[type=checkbox][data-card-id]").forEach(input => {
+    panel.querySelectorAll("input[data-card-id]").forEach(input => {
         input.addEventListener("change", e => {
             const id = e.target.getAttribute("data-card-id");
-            const checked = e.target.checked;
-            currentUserSettings.cards[id] = checked;
-            if (loggedInUser) saveUserSettings(loggedInUser, currentUserSettings);
+            currentUserSettings.cards[id] = e.target.checked;
+            saveUserSettings(loggedInUser, currentUserSettings);
             applySettingsToDashboard();
         });
     });
 
-    const redInput = document.getElementById("repRedInput");
-    const orangeInput = document.getElementById("repOrangeInput");
-
-    redInput.addEventListener("change", () => {
-        const v = parseFloat(redInput.value);
-        if (!isNaN(v)) {
-            currentUserSettings.thresholds.reputation.red = v;
-            if (loggedInUser) saveUserSettings(loggedInUser, currentUserSettings);
-            applySettingsToDashboard();
-        }
+    document.getElementById("repRedInput").addEventListener("change", e => {
+        currentUserSettings.thresholds.reputation.red = parseFloat(e.target.value);
+        saveUserSettings(loggedInUser, currentUserSettings);
+        applySettingsToDashboard();
     });
 
-    orangeInput.addEventListener("change", () => {
-        const v = parseFloat(orangeInput.value);
-        if (!isNaN(v)) {
-            currentUserSettings.thresholds.reputation.orange = v;
-            if (loggedInUser) saveUserSettings(loggedInUser, currentUserSettings);
-            applySettingsToDashboard();
-        }
+    document.getElementById("repOrangeInput").addEventListener("change", e => {
+        currentUserSettings.thresholds.reputation.orange = parseFloat(e.target.value);
+        saveUserSettings(loggedInUser, currentUserSettings);
+        applySettingsToDashboard();
     });
 }
 
@@ -663,25 +583,18 @@ function buildSettingsPanel(panel) {
 function applySettingsToDashboard() {
     const s = currentUserSettings || DEFAULT_SETTINGS;
 
-    const cardIds = Object.keys(s.cards);
-    for (const id of cardIds) {
+    Object.entries(s.cards).forEach(([id, visible]) => {
         const el = document.getElementById(id);
-        if (!el) continue;
-        el.style.display = s.cards[id] ? "" : "none";
-    }
+        if (el) el.style.display = visible ? "" : "none";
+    });
 
     const repEl = document.getElementById("repCard");
     if (repEl) {
-        const valEl = repEl.querySelector(".value");
-        if (valEl) {
-            const rep = parseFloat(valEl.textContent);
-            if (!isNaN(rep)) {
-                const red = s.thresholds.reputation.red;
-                const orange = s.thresholds.reputation.orange;
-                const status = rep <= red ? "danger" : rep < orange ? "warning" : "ok";
-                setCard("repCard", rep, status);
-            }
-        }
+        const rep = parseFloat(repEl.querySelector(".value").textContent);
+        const red = s.thresholds.reputation.red;
+        const orange = s.thresholds.reputation.orange;
+        const status = rep <= red ? "danger" : rep < orange ? "warning" : "ok";
+        setCard("repCard", rep, status);
     }
 }
 // ----------------------------------------------------
@@ -745,6 +658,7 @@ async function checkUser() {
 
     applyTooltips();
 
+    // Color rules
     const repStatus = rep <= repRed ? "danger" : rep < repOrange ? "warning" : "ok";
     setCard("repCard", rep, repStatus);
     setCard("ageCard", age, age < 31 ? "danger" : "ok");
@@ -761,6 +675,7 @@ async function checkUser() {
 
     setCard("keCard", ke.krampus.toFixed(4), keStatus);
 
+    // HISTORY
     const hist = await getHistory30d(user);
 
     const pc = postsComments7d(hist, user);
@@ -774,6 +689,7 @@ async function checkUser() {
 
     setCard("ratioCard", pc.ratio.toFixed(2), ratioStatus);
 
+    // UNIQUE UPVOTES
     const uniqueUp = uniqueUpvotedAuthors(hist, user);
     const upStatus =
         uniqueUp < 25 ? "danger" :
@@ -782,6 +698,7 @@ async function checkUser() {
 
     setCard("uniqueUpvotesCard", uniqueUp, upStatus);
 
+    // TRANSFERS
     const transfers = outgoingTransfers(hist, user);
     const sum = summarizeTransfers(transfers);
 
@@ -813,6 +730,7 @@ async function checkUser() {
         `;
     }
 
+    // DOWNVOTES
     const dv = downvotes(hist, user);
     const totalDV = Object.values(dv).reduce((a, b) => a + b, 0);
 
@@ -844,6 +762,7 @@ async function checkUser() {
         `;
     }
 
+    // OUTGOING DELEGATIONS
     const delegs = await getOutgoingDelegations(user);
 
     if (delegs.length > 0) {
@@ -865,6 +784,7 @@ async function checkUser() {
         `;
     }
 
+    // Apply user settings (hide cards, apply thresholds)
     applySettingsToDashboard();
 }
 
@@ -877,7 +797,7 @@ document.getElementById("username").addEventListener("keydown", e => {
     if (e.key === "Enter") checkUser();
 });
 
-window.checkUser = checkUser;
-
 // Initial top bar render
 renderTopBar();
+
+window.checkUser = checkUser;
