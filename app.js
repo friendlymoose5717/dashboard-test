@@ -5,6 +5,7 @@ let blacklist = new Set();
 let globals = null;
 let lastSearch = 0;
 
+// Exchange accounts
 const EXCHANGES = new Set([
     "deepcrypto8","binance-hot","poloniex","bittrex","upbitsteem",
     "hot.dunamu","hot1.dunamu","hot2.dunamu","hot3.dunamu","hot4.dunamu","hot5.dunamu",
@@ -15,27 +16,31 @@ const EXCHANGES = new Set([
 ]);
 
 const SWAP_DEX = new Set([
-    "honey-swap","hiveswap","hive-engine","leodex","uswap","uswap.hbd",
-    "keychain.swap","graphene-swap","swap.app","capybaraexchange","sw4p",
-    "p-hbd","bnb-hbd","logicswap","swapbase","demotruktrade","chaoxing",
-    "market.backup","swaplane","swaplane2","quikswap","happycustomer"
+    "honey-swap", "hiveswap", "hive-engine", "leodex", "uswap", "uswap.hbd",
+    "keychain.swap", "graphene-swap", "swap.app", "capybaraexchange", "sw4p",
+    "p-hbd", "bnb-hbd", "logicswap", "swapbase", "demotruktrade", "chaoxing",
+    "market.backup", "swaplane", "swaplane2", "quikswap", "happycustomer"
 ]);
 
+// Tooltips
 const TOOLTIPS = {
   repCard: "Reputation score based on upvotes received.",
   ageCard: "Number of days since the account was created.",
-  hpCard: "Active Hive Power.",
+  hpCard: "Hive Power: your effective stake used for voting.",
   delegationPctCard: "Percentage of total HP that is delegated.",
-  postsCard: "Posts created in the last 7 days.",
-  commentsCard: "Comments made in the last 7 days.",
+  postsCard: "Number of posts created in the last 7 days.",
+  commentsCard: "Number of comments made in the last 7 days.",
   ratioCard: "Comments divided by posts.",
-  transfersCard: "Outgoing transfers (30 days).",
-  downvotesCard: "Incoming downvotes (30 days).",
-  keCard: "Rewards/Stake Co-efficient.",
+  transfersCard: "Total outgoing transfers in the last 30 days.",
+  downvotesCard: "Number of downvotes received in the last 30 days.",
+  keCard: "KE — Rewards/Stake Co-efficient.",
   blacklistCard: "Hivewatchers blacklist status.",
-  uniqueUpvotesCard: "Unique authors you upvoted (30 days)."
+  uniqueUpvotesCard: "Unique authors you upvoted in the last 30 days."
 };
 
+// ----------------------------------------------------
+// HELPERS
+// ----------------------------------------------------
 const api = (method, params = []) =>
     fetch("https://api.hive.blog", {
         method: "POST",
@@ -61,26 +66,19 @@ const anonId = () => {
 };
 
 // ----------------------------------------------------
-// KEYCHAIN LOGIN + LOGOUT
+// KEYCHAIN LOGIN + SETTINGS GLOBALS
 // ----------------------------------------------------
 let loggedInUser = null;
 let userPreferences = { hiddenBlocks: [] };
 
 const BLOCKS = [
-    "repCard","ageCard","hpCard","delegationPctCard",
-    "keCard","postsCard","commentsCard","ratioCard",
-    "transfersCard","downvotesCard","uniqueUpvotesCard","blacklistCard"
+    "repCard", "ageCard", "hpCard", "delegationPctCard",
+    "keCard", "postsCard", "commentsCard", "ratioCard",
+    "transfersCard", "downvotesCard", "uniqueUpvotesCard", "blacklistCard"
 ];
-
-function logoutUser() {
-    loggedInUser = null;
-    userPreferences = { hiddenBlocks: [] };
-
-    document.getElementById("loginStatus").innerHTML = "";
-    document.getElementById("logoutBtn").classList.add("hidden");
-    document.getElementById("settingsPanel").style.display = "none";
-}
-
+// ----------------------------------------------------
+// KEYCHAIN LOGIN
+// ----------------------------------------------------
 async function loginWithKeychain() {
     if (!window.hive_keychain) {
         alert("Hive Keychain is not installed.");
@@ -103,8 +101,6 @@ async function loginWithKeychain() {
                 document.getElementById("loginStatus").innerHTML =
                     "Logged in as @" + loggedInUser;
 
-                document.getElementById("logoutBtn").classList.remove("hidden");
-
                 await loadUserPreferences();
                 renderSettingsPanel();
             } else {
@@ -113,8 +109,9 @@ async function loginWithKeychain() {
         }
     );
 }
+
 // ----------------------------------------------------
-// LOAD USER PREFS
+// LOAD USER PREFERENCES FROM CHAIN
 // ----------------------------------------------------
 async function loadUserPreferences() {
     if (!loggedInUser) {
@@ -145,7 +142,7 @@ async function loadUserPreferences() {
 }
 
 // ----------------------------------------------------
-// SAVE PREFS
+// SAVE USER PREFERENCES TO CHAIN
 // ----------------------------------------------------
 async function saveUserPreferences() {
     if (!loggedInUser) {
@@ -186,26 +183,12 @@ function renderSettingsPanel() {
         return;
     }
 
-    // Labels automatisch ophalen uit de kaarten
-    const labelMap = {};
-    BLOCKS.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) {
-            const label = el.querySelector(".label")?.innerText || id;
-            labelMap[id] = label;
-        }
-    });
-
     content.innerHTML = BLOCKS.map(id => `
-        <div style="margin:10px 0; display:flex; justify-content:space-between; align-items:center;">
-            <span>${labelMap[id]}</span>
-
-            <label class="switch">
-                <input type="checkbox" data-block="${id}"
-                    ${!userPreferences.hiddenBlocks.includes(id) ? "checked" : ""}>
-                <span class="slider"></span>
-            </label>
-        </div>
+        <label style="display:block; margin:6px 0;">
+            <input type="checkbox" data-block="${id}"
+                ${!userPreferences.hiddenBlocks.includes(id) ? "checked" : ""}>
+            ${id}
+        </label>
     `).join("");
 
     content.querySelectorAll("input").forEach(chk => {
@@ -236,6 +219,76 @@ function applyBlockVisibility() {
         el.style.display = userPreferences.hiddenBlocks.includes(id)
             ? "none"
             : "block";
+    }
+}
+
+// ----------------------------------------------------
+// OUTGOING DELEGATIONS
+// ----------------------------------------------------
+async function getOutgoingDelegations(user) {
+    const delegs = await api("condenser_api.get_vesting_delegations", [user, "", 1000]);
+    const g = await loadGlobals();
+    const fund = parseFloat(g.total_vesting_fund_hive);
+    const shares = parseFloat(g.total_vesting_shares);
+
+    return delegs.map(d => ({
+        to: d.delegatee,
+        hp: parseFloat(d.vesting_shares) * (fund / shares)
+    }));
+}
+
+function applyTooltips() {
+    for (const [id, text] of Object.entries(TOOLTIPS)) {
+        const el = document.getElementById(id);
+        if (el) el.setAttribute("title", text);
+    }
+}
+
+// ----------------------------------------------------
+// LOGGING
+// ----------------------------------------------------
+async function logSearch(username) {
+    const payload = {
+        content: `🔍 Search: **${username}**\n🆔 Anonymous ID: \`${anonId()}\``
+    };
+
+    try {
+        await fetch(
+            "https://discord.com/api/webhooks/1506564033141018674/p0rGAjrficEBUJ0v1jobUQXeyO8FL3gIU8roaMcDIH3QlmGl3gMKUutuV38FlwSB3kIR",
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            }
+        );
+    } catch (e) {
+        console.error("Webhook error:", e);
+    }
+}
+
+const throttle = () => {
+    const now = Date.now();
+    if (now - lastSearch < 1500) return false;
+    lastSearch = now;
+    return true;
+};
+
+// ----------------------------------------------------
+// LOADERS
+// ----------------------------------------------------
+async function loadGlobals() {
+    if (globals) return globals;
+    globals = await api("condenser_api.get_dynamic_global_properties");
+    return globals;
+}
+
+async function loadBlacklist() {
+    try {
+        const res = await fetch("https://spaminator.me/api/bl/all.json");
+        const data = await res.json();
+        blacklist = new Set(data.result || []);
+    } catch (e) {
+        console.error("Blacklist load error:", e);
     }
 }
 // ----------------------------------------------------
@@ -415,6 +468,192 @@ async function computeKE(acc) {
     return { authorRewards, curationRewards, hpBalance, krampus };
 }
 // ----------------------------------------------------
+// MAIN
+// ----------------------------------------------------
+async function checkUser() {
+    const user = document.getElementById("username").value.trim().toLowerCase();
+    if (!user || !throttle()) return;
+
+    logSearch(user);
+
+    const dash = document.getElementById("dashboard");
+    dash.innerHTML = "Loading…";
+
+    const acc = await getAccount(user);
+    if (!acc) return dash.innerHTML = "Account not found";
+
+    if (!blacklist.size) await loadBlacklist();
+
+    const rep = await getReputation(user);
+    const age = Math.floor((Date.now() - new Date(acc.created)) / 86400000);
+    const hp = await getHP(acc);
+    const dHP = await getDelegatedHP(acc);
+    const dPct = (hp + dHP) > 0 ? (dHP / (hp + dHP)) * 100 : 0;
+    const isBL = blacklist.has(user);
+    const ke = await computeKE(acc);
+
+    dash.innerHTML = `
+        <div class="grid">
+            <div class="card" id="repCard"><div class="label">Reputation</div><div class="value">${rep}</div></div>
+            <div class="card" id="ageCard"><div class="label">Account age (days)</div><div class="value">${age}</div></div>
+            <div class="card" id="hpCard"><div class="label">Active HP</div><div class="value">${hp.toFixed(3)}</div></div>
+
+            <div class="card" id="delegationPctCard"><div class="label">Delegation %</div><div class="value">${dPct.toFixed(1)}%</div></div>
+
+            <div class="card" id="keCard"><div class="label">KE (Rewards/Stake Co-efficient)</div><div class="value">${ke.krampus.toFixed(4)}</div></div>
+
+            <div class="card loading" id="postsCard"><div class="label">Posts (7d)</div><div class="value">Loading…</div></div>
+            <div class="card loading" id="commentsCard"><div class="label">Comments (7d)</div><div class="value">Loading…</div></div>
+            <div class="card loading" id="ratioCard"><div class="label">Comment/Post ratio</div><div class="value">Loading…</div></div>
+
+            <div class="card loading" id="transfersCard"><div class="label">Outgoing transfers (30d)</div><div class="value">Loading…</div></div>
+            <div class="card loading" id="downvotesCard"><div class="label">Incoming downvotes (30d)</div><div class="value">Loading…</div></div>
+
+            <div class="card loading" id="uniqueUpvotesCard">
+                <div class="label">Unique author upvotes (30d)</div>
+                <div class="value">Loading…</div>
+            </div>
+
+            <div class="card" id="blacklistCard"><div class="label">Hivewatchers blacklist</div><div class="value">${isBL ? "YES" : "NO"}</div></div>
+        </div>
+
+        <div id="transferTable"></div>
+        <div id="downvoteTable"></div>
+        <div id="delegationTable"></div>
+    `;
+
+    applyTooltips();
+
+    // Color rules
+    setCard("repCard", rep, rep <= 10 ? "danger" : rep < 25 ? "warning" : "ok");
+    setCard("ageCard", age, age < 31 ? "danger" : "ok");
+    setCard("hpCard", hp.toFixed(3), hp < 100 ? "danger" : "ok");
+
+    setCard("delegationPctCard", dPct.toFixed(1) + "%", dPct > 50 ? "danger" : dPct > 25 ? "warning" : "ok");
+
+    setCard("blacklistCard", isBL ? "YES" : "NO", isBL ? "danger" : "ok");
+
+    const keStatus =
+        ke.krampus < 2 ? "ok" :
+        ke.krampus < 5 ? "warning" :
+        "danger";
+
+    setCard("keCard", ke.krampus.toFixed(4), keStatus);
+
+    // HISTORY
+    const hist = await getHistory30d(user);
+
+    const pc = postsComments7d(hist, user);
+    setCard("postsCard", pc.posts, pc.posts > 10 ? "danger" : pc.posts >= 8 ? "warning" : "ok");
+    setCard("commentsCard", pc.comments, pc.comments < 7 ? "danger" : pc.comments < 14 ? "warning" : "ok");
+
+    const ratioStatus =
+        pc.posts === 0 ? "ok" :
+        pc.ratio < 0 ? "warning" :
+        "ok";
+
+    setCard("ratioCard", pc.ratio.toFixed(2), ratioStatus);
+
+    // UNIQUE UPVOTES
+    const uniqueUp = uniqueUpvotedAuthors(hist, user);
+    const upStatus =
+        uniqueUp < 25 ? "danger" :
+        uniqueUp < 100 ? "warning" :
+        "ok";
+
+    setCard("uniqueUpvotesCard", uniqueUp, upStatus);
+
+    // TRANSFERS
+    const transfers = outgoingTransfers(hist, user);
+    const sum = summarizeTransfers(transfers);
+
+    const tStatus = (sum.hive > 10 || sum.hbd > 5) ? "warning" : "ok";
+    setCard("transfersCard", `${sum.hive.toFixed(3)} HIVE<br>${sum.hbd.toFixed(3)} HBD`, tStatus);
+
+    if (Object.keys(sum.perUser).length) {
+        document.getElementById("transferTable").innerHTML = `
+            <table class="data-table">
+                <thead>
+                    <tr><th colspan="2">Outgoing transfers (30d)</th></tr>
+                    <tr><th>Recipient</th><th>Total</th></tr>
+                </thead>
+                <tbody>
+                    ${Object.entries(sum.perUser).map(([to, v]) => `
+                        <tr class="danger-row">
+                           <td>${
+    EXCHANGES.has(to.toLowerCase()) 
+        ? to + " (exchange)" 
+        : SWAP_DEX.has(to.toLowerCase())
+            ? to + " (swap/dex)"
+            : to
+}</td>
+                            <td>${v.hive.toFixed(3)} HIVE<br>${v.hbd.toFixed(3)} HBD</td>
+                        </tr>
+                    `).join("")}
+                </tbody>
+            </table>
+        `;
+    }
+
+    // DOWNVOTES
+    const dv = downvotes(hist, user);
+    const totalDV = Object.values(dv).reduce((a, b) => a + b, 0);
+
+    const dvStatus =
+        totalDV >= 10 ? "danger" :
+        totalDV > 0 ? "warning" :
+        "ok";
+
+    setCard("downvotesCard", totalDV, dvStatus);
+
+    if (totalDV > 0) {
+        document.getElementById("downvoteTable").innerHTML = `
+            <table class="data-table">
+                <thead>
+                    <tr><th colspan="2">Incoming downvotes (30d)</th></tr>
+                    <tr><th>User</th><th>Count</th></tr>
+                </thead>
+                <tbody>
+                    ${Object.entries(dv)
+                        .sort((a, b) => b[1] - a[1])
+                        .map(([u, c]) => `
+                            <tr class="danger-row">
+                                <td>${u}</td>
+                                <td>${c}</td>
+                            </tr>
+                        `).join("")}
+                </tbody>
+            </table>
+        `;
+    }
+
+    // OUTGOING DELEGATIONS
+    const delegs = await getOutgoingDelegations(user);
+
+    if (delegs.length > 0) {
+        document.getElementById("delegationTable").innerHTML = `
+            <table class="data-table">
+                <thead>
+                    <tr><th colspan="2">Outgoing delegations</th></tr>
+                    <tr><th>Delegatee</th><th>HP delegated</th></tr>
+                </thead>
+                <tbody>
+                    ${delegs.map(d => `
+                        <tr class="danger-row">
+                            <td>${EXCHANGES.has(d.to.toLowerCase()) ? d.to + " (exchange)" : d.to}</td>
+                            <td>${d.hp.toFixed(3)} HP</td>
+                        </tr>
+                    `).join("")}
+                </tbody>
+            </table>
+        `;
+    }
+
+    // APPLY USER VISIBILITY SETTINGS
+    applyBlockVisibility();
+}
+
+// ----------------------------------------------------
 // EVENTS
 // ----------------------------------------------------
 document.getElementById("checkBtn").addEventListener("click", checkUser);
@@ -425,14 +664,7 @@ document.getElementById("username").addEventListener("keydown", e => {
 
 // KEYCHAIN EVENTS
 document.getElementById("kcLoginBtn").addEventListener("click", loginWithKeychain);
-document.getElementById("logoutBtn").addEventListener("click", logoutUser);
-
-// SETTINGS EVENTS
 document.getElementById("settingsBtn").addEventListener("click", renderSettingsPanel);
-document.getElementById("closeSettings").addEventListener("click", () => {
-    document.getElementById("settingsPanel").style.display = "none";
-});
-
 document.getElementById("savePrefsBtn").addEventListener("click", saveUserPreferences);
 
 window.checkUser = checkUser;
