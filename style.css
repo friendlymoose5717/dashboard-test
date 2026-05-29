@@ -15,6 +15,62 @@ body {
 }
 
 /* ----------------------------------------------------
+   TOP BAR (MINIMALISTISCH LOGIN + SETTINGS)
+---------------------------------------------------- */
+.topbar {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 10px 30px 0 30px;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.topbar-inner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+.topbar-user {
+    opacity: 0.8;
+}
+
+.topbar-input {
+    padding: 4px 6px;
+    border-radius: 6px;
+    border: 1px solid #1f2937;
+    background: #0f172a;
+    color: #e5e7eb;
+    width: 120px;
+}
+
+.topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.topbar-btn {
+    padding: 4px 8px;
+    border-radius: 6px;
+    border: 1px solid #1f2937;
+    background: #111827;
+    color: #e5e7eb;
+    cursor: pointer;
+    font-size: 0.8rem;
+    opacity: 0.9;
+    transition: 0.2s;
+}
+
+.topbar-btn:hover {
+    background: #1f2937;
+    border-color: #3b82f6;
+    opacity: 1;
+}
+
+/* ----------------------------------------------------
    SEARCH BAR
 ---------------------------------------------------- */
 input#username {
@@ -22,7 +78,7 @@ input#username {
     padding: 12px;
     border-radius: 8px;
     border: 1px solid #3b82f6;
-    background: #1e3a8a;      /* helder blauw */
+    background: #1e3a8a;
     color: #e5e7eb;
     outline: none;
     transition: 0.2s;
@@ -85,7 +141,7 @@ button:hover {
 }
 
 .card.warning {
-    background: #f37616 ;
+    background: #f37616;
     border-color: #f97316;
 }
 
@@ -117,16 +173,15 @@ button:hover {
 .data-table {
     width: 100%;
     border-collapse: collapse;
-    background: #0d1628;          /* diepe blauwgrijs */
+    background: #0d1628;
     border-radius: 10px;
     overflow: hidden;
     margin-top: 20px;
     box-shadow: 0 0 14px rgba(0,0,0,0.45);
 }
 
-/* HEADER ROW */
 .data-table thead th {
-    background: #1b2b4a;          /* donkerblauw */
+    background: #1b2b4a;
     color: #e5e7eb;
     padding: 12px;
     font-size: 1.1em;
@@ -134,35 +189,29 @@ button:hover {
     border-bottom: 1px solid #2c3e5f;
 }
 
-/* BODY CELLS */
 .data-table td,
 .data-table th {
     padding: 10px 12px;
     border-bottom: 1px solid #1a2438;
 }
 
-/* ODD ROWS */
 .data-table tbody tr:nth-child(odd) {
-    background: #111c30;          /* donkerder */
+    background: #111c30;
 }
 
-/* EVEN ROWS */
 .data-table tbody tr:nth-child(even) {
-    background: #162238;          /* iets lichter */
+    background: #162238;
 }
 
-/* HOVER */
 .data-table tbody tr:hover {
-    background: #1f2f4a;          /* helder maar subtiel */
+    background: #1f2f4a;
 }
 
-/* DANGER ROW — amber/oranje ipv rood */
 .data-table .danger-row td {
-    background: #3a2a12;          /* warm donker amber */
-    color: #fbbf24;               /* amber-300 */
+    background: #3a2a12;
+    color: #fbbf24;
     font-weight: 600;
 }
-
 
 /* ----------------------------------------------------
    MISC
