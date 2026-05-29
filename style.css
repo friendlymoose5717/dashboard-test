@@ -80,18 +80,15 @@ button:hover {
 }
 
 .card.ok {
-    background: #064e3b;
-    border-color: #10b981;
+    border-left: 4px solid #22c55e; /* groen */
 }
 
 .card.warning {
-    background: #f37616 ;
-    border-color: #f97316;
+    border-left: 4px solid #f59e0b; /* oranje */
 }
 
 .card.danger {
-    background: #7f1d1d;
-    border-color: #ef4444;
+    border-left: 4px solid #ef4444; /* rood */
 }
 
 .card.loading {
