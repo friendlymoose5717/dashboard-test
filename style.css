@@ -2,172 +2,163 @@
    GLOBAL
 ---------------------------------------------------- */
 body {
-    font-family: Arial, sans-serif;
-    background: #111827;
-    color: #e5e7eb;
     margin: 0;
-    padding: 40px;
+    font-family: Arial, sans-serif;
+    background: #0b1220;
+    color: #e5e7eb;
 }
 
 .container {
     max-width: 900px;
     margin: auto;
+    padding: 30px;
 }
 
 /* ----------------------------------------------------
-   SEARCH BAR
+   TOP BAR
 ---------------------------------------------------- */
-input#username {
-    width: 70%;
-    padding: 12px;
-    border-radius: 8px;
+#topBar {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 12px;
+    padding: 15px 25px;
+    background: #111827;
+    border-bottom: 1px solid #1f2937;
+}
+
+#loginUserInput {
+    padding: 8px;
+    border-radius: 6px;
     border: 1px solid #3b82f6;
-    background: #1e3a8a;      /* helder blauw */
-    color: #e5e7eb;
-    outline: none;
-    transition: 0.2s;
-}
-
-input#username::placeholder {
-    color: #cbd5e1;
-}
-
-input#username:focus {
-    background: #1e40af;
-    border-color: #60a5fa;
-    box-shadow: 0 0 8px rgba(96,165,250,0.4);
-}
-
-button {
-    padding: 12px 16px;
-    border: none;
-    border-radius: 8px;
-    background: #3b82f6;
+    background: #1e3a8a;
     color: white;
-    cursor: pointer;
-    margin-left: 8px;
-    transition: 0.2s;
+    width: 160px;
 }
 
-button:hover {
+/* 🔥 BLACK + RED KEYCHAIN BUTTON */
+.kc-btn {
+    background: black;
+    color: #ff3b3b;
+    border: 1px solid #ff3b3b;
+    padding: 8px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+}
+.kc-btn:hover {
+    background: #330000;
+}
+
+/* Logout button */
+.logout-btn {
+    background: #444;
+    color: white;
+    border-radius: 6px;
+    padding: 8px 14px;
+    cursor: pointer;
+}
+.logout-btn:hover {
+    background: #666;
+}
+
+/* Settings icon */
+.settings-icon {
+    cursor: pointer;
+    font-size: 22px;
+}
+
+/* ----------------------------------------------------
+   SETTINGS PANEL
+---------------------------------------------------- */
+#settingsPanel {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    width: 280px;
+    background: #0d1628;
+    border: 1px solid #1a2438;
+    padding: 20px;
+    border-radius: 10px;
+    display: none;
+    box-shadow: 0 0 12px rgba(0,0,0,0.4);
+}
+
+.settings-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.close-btn {
+    cursor: pointer;
+    font-size: 20px;
+    opacity: 0.8;
+}
+.close-btn:hover {
+    opacity: 1;
+}
+
+/* Save button */
+.save-btn {
+    width: 100%;
+    margin-top: 10px;
+    background: #3b82f6;
+    padding: 10px;
+    border-radius: 8px;
+}
+.save-btn:hover {
     background: #2563eb;
 }
 
 /* ----------------------------------------------------
-   GRID + CARDS
+   TOGGLE SWITCHES
 ---------------------------------------------------- */
-.grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 15px;
-    margin-top: 25px;
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 46px;
+    height: 22px;
+    margin-left: 10px;
 }
 
-@media (max-width: 900px) {
-    .grid { grid-template-columns: repeat(2, 1fr); }
+.switch input {
+    display: none;
 }
 
-@media (max-width: 600px) {
-    .grid { grid-template-columns: 1fr; }
+.slider {
+    position: absolute;
+    cursor: pointer;
+    background-color: #555;
+    border-radius: 22px;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    transition: .3s;
 }
 
-.card {
-    background: #1f2937;
-    border-radius: 12px;
-    padding: 15px;
-    border: 1px solid #374151;
-    transition: 0.25s;
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 2px;
+    bottom: 2px;
+    background-color: white;
+    border-radius: 50%;
+    transition: .3s;
 }
 
-.card.ok {
-    background: #064e3b;
-    border-color: #10b981;
+input:checked + .slider {
+    background-color: #3b82f6;
 }
 
-.card.warning {
-    background: #f37616 ;
-    border-color: #f97316;
-}
-
-.card.danger {
-    background: #7f1d1d;
-    border-color: #ef4444;
-}
-
-.card.loading {
-    background: #1f2937;
-    border-color: #374151;
-    opacity: 0.6;
-}
-
-.label {
-    font-size: 12px;
-    opacity: 0.7;
-}
-
-.value {
-    font-size: 22px;
-    margin-top: 6px;
-    font-weight: bold;
+input:checked + .slider:before {
+    transform: translateX(24px);
 }
 
 /* ----------------------------------------------------
-   TABLES — COOL DARK THEME
+   CARDS, TABLES (ongewijzigd)
 ---------------------------------------------------- */
-.data-table {
-    width: 100%;
-    border-collapse: collapse;
-    background: #0d1628;          /* diepe blauwgrijs */
-    border-radius: 10px;
-    overflow: hidden;
-    margin-top: 20px;
-    box-shadow: 0 0 14px rgba(0,0,0,0.45);
-}
-
-/* HEADER ROW */
-.data-table thead th {
-    background: #1b2b4a;          /* donkerblauw */
-    color: #e5e7eb;
-    padding: 12px;
-    font-size: 1.1em;
-    text-align: left;
-    border-bottom: 1px solid #2c3e5f;
-}
-
-/* BODY CELLS */
-.data-table td,
-.data-table th {
-    padding: 10px 12px;
-    border-bottom: 1px solid #1a2438;
-}
-
-/* ODD ROWS */
-.data-table tbody tr:nth-child(odd) {
-    background: #111c30;          /* donkerder */
-}
-
-/* EVEN ROWS */
-.data-table tbody tr:nth-child(even) {
-    background: #162238;          /* iets lichter */
-}
-
-/* HOVER */
-.data-table tbody tr:hover {
-    background: #1f2f4a;          /* helder maar subtiel */
-}
-
-/* DANGER ROW — amber/oranje ipv rood */
-.data-table .danger-row td {
-    background: #3a2a12;          /* warm donker amber */
-    color: #fbbf24;               /* amber-300 */
-    font-weight: 600;
-}
-
-
-/* ----------------------------------------------------
-   MISC
----------------------------------------------------- */
-.hidden { display: none; }
-.error { color: #f87171; }
-.good { color: #4ade80; }
-.bad { color: #f87171; }
+/* ... jouw bestaande CSS blijft hier staan ... */
