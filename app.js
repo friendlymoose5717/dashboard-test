@@ -565,6 +565,10 @@ async function checkUser() {
     if (!blacklist.size) await loadBlacklist();
 
     const rep = await getReputation(user);
+    // Ensure thresholds always exist
+if (!userPreferences.thresholds) {
+    userPreferences.thresholds = { reputation: { warning: 25, danger: 10 } };
+}
     const age = Math.floor((Date.now() - new Date(acc.created)) / 86400000);
     const hp = await getHP(acc);
     const dHP = await getDelegatedHP(acc);
