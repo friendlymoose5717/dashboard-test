@@ -1,73 +1,11 @@
 // ----------------------------------------------------
-// GLOBALS!
+// GLOBALS
 // ----------------------------------------------------
 let blacklist = new Set();
 let globals = null;
 let lastSearch = 0;
 
-// ----------------------------------------------------
-// LOGIN + SETTINGS GLOBALS
-// ----------------------------------------------------
-let loggedInUser = null;
-let currentUserSettings = null;
-
-const DEFAULT_SETTINGS = {
-    cards: {
-        repCard: true,
-        ageCard: true,
-        hpCard: true,
-        delegationPctCard: true,
-        keCard: true,
-        postsCard: true,
-        commentsCard: true,
-        ratioCard: true,
-        transfersCard: true,
-        downvotesCard: true,
-        uniqueUpvotesCard: true,
-        blacklistCard: true
-    },
-    thresholds: {
-        reputation: {
-            red: 10,
-            orange: 25
-        }
-    }
-};
-
-function getSettingsKey(username) {
-    return `hive_health_settings_${username}`;
-}
-
-function loadUserSettings(username) {
-    const raw = localStorage.getItem(getSettingsKey(username));
-    if (!raw) return structuredClone(DEFAULT_SETTINGS);
-    try {
-        const parsed = JSON.parse(raw);
-        const merged = structuredClone(DEFAULT_SETTINGS);
-
-        if (parsed.cards) {
-            for (const k of Object.keys(merged.cards)) {
-                if (k in parsed.cards) merged.cards[k] = parsed.cards[k];
-            }
-        }
-        if (parsed.thresholds && parsed.thresholds.reputation) {
-            const t = parsed.thresholds.reputation;
-            if (typeof t.red === "number") merged.thresholds.reputation.red = t.red;
-            if (typeof t.orange === "number") merged.thresholds.reputation.orange = t.orange;
-        }
-        return merged;
-    } catch {
-        return structuredClone(DEFAULT_SETTINGS);
-    }
-}
-
-function saveUserSettings(username, settings) {
-    localStorage.setItem(getSettingsKey(username), JSON.stringify(settings));
-}
-
-// ----------------------------------------------------
-// EXCHANGE ACCOUNTS
-// ----------------------------------------------------
+// Exchange accounts
 const EXCHANGES = new Set([
     "deepcrypto8","binance-hot","poloniex","bittrex","upbitsteem",
     "hot.dunamu","hot1.dunamu","hot2.dunamu","hot3.dunamu","hot4.dunamu","hot5.dunamu",
@@ -84,9 +22,7 @@ const SWAP_DEX = new Set([
     "market.backup", "swaplane", "swaplane2", "quikswap", "happycustomer"
 ]);
 
-// ----------------------------------------------------
-// TOOLTIP DEFINITIONS
-// ----------------------------------------------------
+// Tooltips
 const TOOLTIPS = {
   repCard: "Reputation score based on upvotes received.",
   ageCard: "Number of days since the account was created.",
@@ -116,17 +52,9 @@ const daysAgo = d => Date.now() - d * 86400000;
 
 const setCard = (id, value, status) => {
     const el = document.getElementById(id);
-    if (!el) return;
     el.querySelector(".value").innerHTML = value;
     el.className = "card " + status;
 };
-
-function applyTooltips() {
-    for (const [id, text] of Object.entries(TOOLTIPS)) {
-        const el = document.getElementById(id);
-        if (el) el.setAttribute("title", text);
-    }
-}
 
 const anonId = () => {
     let id = localStorage.getItem("anon_id");
@@ -138,30 +66,190 @@ const anonId = () => {
 };
 
 // ----------------------------------------------------
+// KEYCHAIN LOGIN + SETTINGS GLOBALS
+// ----------------------------------------------------
+let loggedInUser = null;
+let userPreferences = { hiddenBlocks: [] };
+
+const BLOCKS = [
+    "repCard", "ageCard", "hpCard", "delegationPctCard",
+    "keCard", "postsCard", "commentsCard", "ratioCard",
+    "transfersCard", "downvotesCard", "uniqueUpvotesCard", "blacklistCard"
+];
+// ----------------------------------------------------
+// KEYCHAIN LOGIN
+// ----------------------------------------------------
+async function loginWithKeychain() {
+    if (!window.hive_keychain) {
+        alert("Hive Keychain is not installed.");
+        return;
+    }
+
+    const username = document.getElementById("loginUserInput").value.trim();
+    if (!username) {
+        alert("Please enter your Hive username first.");
+        return;
+    }
+
+    hive_keychain.requestSignBuffer(
+        username,
+        "login-" + Date.now(),
+        "Posting",
+        async (res) => {
+            if (res.success) {
+                loggedInUser = username.toLowerCase();
+                document.getElementById("loginStatus").innerHTML =
+                    "Logged in as @" + loggedInUser;
+
+                await loadUserPreferences();
+                renderSettingsPanel();
+            } else {
+                alert("Login failed.");
+            }
+        }
+    );
+}
+
+// ----------------------------------------------------
+// LOAD USER PREFERENCES FROM CHAIN
+// ----------------------------------------------------
+async function loadUserPreferences() {
+    if (!loggedInUser) {
+        userPreferences = { hiddenBlocks: [] };
+        return;
+    }
+
+    const history = await api("condenser_api.get_account_history", [
+        loggedInUser,
+        -1,
+        1000
+    ]);
+
+    userPreferences = { hiddenBlocks: [] };
+
+    for (const h of history.reverse()) {
+        const op = h[1].op;
+        if (op[0] === "custom_json" && op[1].id === "hive-dashboard-prefs") {
+            try {
+                const data = JSON.parse(op[1].json);
+                userPreferences = data.prefs || { hiddenBlocks: [] };
+                return;
+            } catch (e) {
+                console.error("Prefs parse error:", e);
+            }
+        }
+    }
+}
+
+// ----------------------------------------------------
+// SAVE USER PREFERENCES TO CHAIN
+// ----------------------------------------------------
+async function saveUserPreferences() {
+    if (!loggedInUser) {
+        alert("Settings can only be saved when logged in with your Hive account.");
+        return;
+    }
+
+    const json = {
+        app: "hive-account-health-dashboard",
+        prefs: userPreferences
+    };
+
+    hive_keychain.requestCustomJson(
+        loggedInUser,
+        "hive-dashboard-prefs",
+        "Posting",
+        JSON.stringify(json),
+        "Save dashboard preferences",
+        (res) => {
+            if (!res.success) {
+                alert("Failed to save preferences.");
+            }
+        }
+    );
+}
+
+// ----------------------------------------------------
+// SETTINGS PANEL RENDER
+// ----------------------------------------------------
+function renderSettingsPanel() {
+    const panel = document.getElementById("settingsPanel");
+    const content = document.getElementById("settingsContent");
+
+    panel.style.display = "block";
+
+    if (!loggedInUser) {
+        content.innerHTML = `<p>Settings can only be saved when logged in with your Hive account.</p>`;
+        return;
+    }
+
+    content.innerHTML = BLOCKS.map(id => `
+        <label style="display:block; margin:6px 0;">
+            <input type="checkbox" data-block="${id}"
+                ${!userPreferences.hiddenBlocks.includes(id) ? "checked" : ""}>
+            ${id}
+        </label>
+    `).join("");
+
+    content.querySelectorAll("input").forEach(chk => {
+        chk.addEventListener("change", () => {
+            const id = chk.dataset.block;
+            if (!chk.checked) {
+                if (!userPreferences.hiddenBlocks.includes(id))
+                    userPreferences.hiddenBlocks.push(id);
+            } else {
+                userPreferences.hiddenBlocks =
+                    userPreferences.hiddenBlocks.filter(x => x !== id);
+            }
+            applyBlockVisibility();
+        });
+    });
+
+    applyBlockVisibility();
+}
+
+// ----------------------------------------------------
+// APPLY VISIBILITY
+// ----------------------------------------------------
+function applyBlockVisibility() {
+    for (const id of BLOCKS) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+
+        el.style.display = userPreferences.hiddenBlocks.includes(id)
+            ? "none"
+            : "block";
+    }
+}
+
+// ----------------------------------------------------
+// OUTGOING DELEGATIONS
+// ----------------------------------------------------
+async function getOutgoingDelegations(user) {
+    const delegs = await api("condenser_api.get_vesting_delegations", [user, "", 1000]);
+    const g = await loadGlobals();
+    const fund = parseFloat(g.total_vesting_fund_hive);
+    const shares = parseFloat(g.total_vesting_shares);
+
+    return delegs.map(d => ({
+        to: d.delegatee,
+        hp: parseFloat(d.vesting_shares) * (fund / shares)
+    }));
+}
+
+function applyTooltips() {
+    for (const [id, text] of Object.entries(TOOLTIPS)) {
+        const el = document.getElementById(id);
+        if (el) el.setAttribute("title", text);
+    }
+}
+
+// ----------------------------------------------------
 // LOGGING
 // ----------------------------------------------------
 async function logSearch(username) {
     const payload = {
         content: `🔍 Search: **${username}**\n🆔 Anonymous ID: \`${anonId()}\``
-    };
-
-    try {
-        await fetch(
-            "https://discord.com/api/webhooks/1506564033141018674/p0rGAjrficEBUJ0v1jobUQXeyO8FL3gIU8roaMcDIH3QlmGl3gMKUutuV38FlwSB3kIR",
-            {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            }
-        );
-    } catch (e) {
-        console.error("Webhook error:", e);
-    }
-}
-
-async function logLogin(username) {
-    const payload = {
-        content: `🔐 Login via Hive Keychain: **${username}**`
     };
 
     try {
@@ -375,285 +463,9 @@ async function computeKE(acc) {
 
     const hpBalance = shares ? (fund * vesting) / shares : 0;
 
-    const krampus = hpBalance
-        ? (authorRewards + curationRewards) / hpBalance
-        : -1;
+    const krampus = hpBalance ? (authorRewards + curationRewards) / hpBalance : -1;
 
     return { authorRewards, curationRewards, hpBalance, krampus };
-}
-// ----------------------------------------------------
-// HIVE KEYCHAIN LOGIN (HANDSHAKE + SIGNBUFFER)
-// ----------------------------------------------------
-async function keychainLogin() {
-    if (!window.hive_keychain) {
-        alert("Hive Keychain is not installed.");
-        return;
-    }
-
-    // 1. Username ophalen zoals prompt() dat deed
-    const usernameInput = document.getElementById("loginUsername");
-    let username = usernameInput?.value?.trim().toLowerCase().replace("@", "");
-
-    if (!username) {
-        alert("Please enter your Hive username.");
-        return;
-    }
-
-    // 2. Check of account bestaat (oude code deed dit niet, maar is slim)
-    const acc = await getAccount(username);
-    if (!acc) {
-        alert("This Hive account does not exist.");
-        return;
-    }
-
-    // 3. SignBuffer exact zoals jouw oude code
-    hive_keychain.requestSignBuffer(
-        username,
-        "login-" + Date.now(),
-        "Posting",
-        async (res) => {
-            if (res.success) {
-                loggedInUser = username;
-                currentUserSettings = loadUserSettings(loggedInUser);
-
-                renderTopBar();
-                applySettingsToDashboard();
-
-                await logLogin(loggedInUser);
-            } else {
-                alert("Login failed.");
-            }
-        }
-    );
-}
-
-    if (!window.hive_keychain) {
-        alert("Hive Keychain extension not detected.");
-        return;
-    }
-
-    const usernameInput = document.getElementById("loginUsername");
-    if (!usernameInput || !usernameInput.value.trim()) {
-        alert("Please enter your Hive username before logging in.");
-        return;
-    }
-
-    const username = usernameInput.value.trim().toLowerCase();
-
-    try {
-        // 1. Handshake
-        await new Promise((resolve, reject) => {
-            hive_keychain.requestHandshake(res => {
-                if (res && res.success) resolve(res);
-                else reject(new Error("Handshake failed"));
-            });
-        });
-
-        // 2. Nonce
-        const nonce = `HiveHealthLogin-${Date.now()}-${Math.random()}`;
-
-        // 3. SignBuffer (username is verplicht!)
-        const signRes = await new Promise((resolve, reject) => {
-            hive_keychain.requestSignBuffer(
-                username,
-                nonce,
-                "Posting",
-                res => {
-                    if (res && res.success) resolve(res);
-                    else reject(new Error("SignBuffer failed"));
-                }
-            );
-        });
-
-        // 4. Username ophalen uit ALLE Keychain varianten
-        const returnedUser =
-            signRes?.data?.username ||
-            signRes?.result?.username ||
-            signRes?.username ||
-            signRes?.msg?.username ||
-            signRes?.request?.username ||
-            signRes?.payload?.username ||
-            username;
-
-        loggedInUser = returnedUser;
-        currentUserSettings = loadUserSettings(loggedInUser);
-
-        renderTopBar();
-        applySettingsToDashboard();
-
-        await logLogin(loggedInUser);
-
-    } catch (e) {
-        console.error("Keychain login error:", e);
-        alert("Login failed or was cancelled.");
-    }
-}
-
-// ----------------------------------------------------
-// LOGOUT
-// ----------------------------------------------------
-function logoutUser() {
-    loggedInUser = null;
-    currentUserSettings = null;
-    renderTopBar();
-    applySettingsToDashboard();
-}
-
-// ----------------------------------------------------
-// TOP BAR RENDER (MINIMALISTISCH)
-// ----------------------------------------------------
-function renderTopBar() {
-    const el = document.getElementById("topBar");
-    if (!el) return;
-
-    const userPart = loggedInUser
-        ? `<span class="topbar-user">👤 ${loggedInUser}</span>`
-        : `<input id="loginUsername" class="topbar-input" placeholder="username">`;
-
-    const loginBtn = !loggedInUser
-        ? `<button id="loginBtn" class="topbar-btn">Login</button>`
-        : `<button id="logoutBtn" class="topbar-btn" title="Logout">⎋</button>`;
-
-    const settingsBtn = `<button id="settingsBtn" class="topbar-btn" title="Settings">⚙️</button>`;
-
-    el.innerHTML = `
-        <div class="topbar-inner">
-            ${userPart}
-            <div class="topbar-actions">
-                ${settingsBtn}
-                ${loginBtn}
-            </div>
-        </div>
-    `;
-
-    if (document.getElementById("loginBtn"))
-        document.getElementById("loginBtn").addEventListener("click", keychainLogin);
-
-    if (document.getElementById("logoutBtn"))
-        document.getElementById("logoutBtn").addEventListener("click", logoutUser);
-
-    document.getElementById("settingsBtn").addEventListener("click", onSettingsClick);
-}
-
-// ----------------------------------------------------
-// SETTINGS PANEL
-// ----------------------------------------------------
-function ensureSettingsPanel() {
-    let panel = document.getElementById("settingsPanel");
-    if (panel) return panel;
-
-    panel = document.createElement("div");
-    panel.id = "settingsPanel";
-    panel.className = "settings-panel hidden";
-    document.body.appendChild(panel);
-    return panel;
-}
-
-function onSettingsClick() {
-    if (!loggedInUser) {
-        alert("Settings can only be stored when you are logged in.");
-        return;
-    }
-    if (!currentUserSettings)
-        currentUserSettings = loadUserSettings(loggedInUser);
-
-    const panel = ensureSettingsPanel();
-    buildSettingsPanel(panel);
-    panel.classList.toggle("hidden");
-}
-
-function buildSettingsPanel(panel) {
-    const s = currentUserSettings;
-
-    const cardRows = [
-        { id: "repCard", label: "Reputation" },
-        { id: "ageCard", label: "Account age" },
-        { id: "hpCard", label: "Active HP" },
-        { id: "delegationPctCard", label: "Delegation %" },
-        { id: "keCard", label: "KE" },
-        { id: "postsCard", label: "Posts (7d)" },
-        { id: "commentsCard", label: "Comments (7d)" },
-        { id: "ratioCard", label: "Comment/Post ratio" },
-        { id: "transfersCard", label: "Transfers (30d)" },
-        { id: "downvotesCard", label: "Downvotes (30d)" },
-        { id: "uniqueUpvotesCard", label: "Unique upvotes" },
-        { id: "blacklistCard", label: "Blacklist" }
-    ];
-
-    panel.innerHTML = `
-        <div class="settings-header">
-            <span>Dashboard settings</span>
-            <button id="settingsCloseBtn" class="settings-close">✕</button>
-        </div>
-
-        <div class="settings-body">
-            <h4>Cards</h4>
-            ${cardRows.map(row => `
-                <div class="settings-row">
-                    <span>${row.label}</span>
-                    <label class="switch">
-                        <input type="checkbox" data-card-id="${row.id}" ${s.cards[row.id] ? "checked" : ""}>
-                        <span class="slider"></span>
-                    </label>
-                </div>
-            `).join("")}
-
-            <h4>Reputation thresholds</h4>
-            <div class="settings-row">
-                <span>Red</span>
-                <input type="number" id="repRedInput" value="${s.thresholds.reputation.red}">
-            </div>
-            <div class="settings-row">
-                <span>Orange</span>
-                <input type="number" id="repOrangeInput" value="${s.thresholds.reputation.orange}">
-            </div>
-        </div>
-    `;
-
-    document.getElementById("settingsCloseBtn")
-        .addEventListener("click", () => panel.classList.add("hidden"));
-
-    panel.querySelectorAll("input[data-card-id]").forEach(input => {
-        input.addEventListener("change", e => {
-            const id = e.target.getAttribute("data-card-id");
-            currentUserSettings.cards[id] = e.target.checked;
-            saveUserSettings(loggedInUser, currentUserSettings);
-            applySettingsToDashboard();
-        });
-    });
-
-    document.getElementById("repRedInput").addEventListener("change", e => {
-        currentUserSettings.thresholds.reputation.red = parseFloat(e.target.value);
-        saveUserSettings(loggedInUser, currentUserSettings);
-        applySettingsToDashboard();
-    });
-
-    document.getElementById("repOrangeInput").addEventListener("change", e => {
-        currentUserSettings.thresholds.reputation.orange = parseFloat(e.target.value);
-        saveUserSettings(loggedInUser, currentUserSettings);
-        applySettingsToDashboard();
-    });
-}
-
-// ----------------------------------------------------
-// APPLY SETTINGS TO DASHBOARD
-// ----------------------------------------------------
-function applySettingsToDashboard() {
-    const s = currentUserSettings || DEFAULT_SETTINGS;
-
-    Object.entries(s.cards).forEach(([id, visible]) => {
-        const el = document.getElementById(id);
-        if (el) el.style.display = visible ? "" : "none";
-    });
-
-    const repEl = document.getElementById("repCard");
-    if (repEl) {
-        const rep = parseFloat(repEl.querySelector(".value").textContent);
-        const red = s.thresholds.reputation.red;
-        const orange = s.thresholds.reputation.orange;
-        const status = rep <= red ? "danger" : rep < orange ? "warning" : "ok";
-        setCard("repCard", rep, status);
-    }
 }
 // ----------------------------------------------------
 // MAIN
@@ -679,10 +491,6 @@ async function checkUser() {
     const dPct = (hp + dHP) > 0 ? (dHP / (hp + dHP)) * 100 : 0;
     const isBL = blacklist.has(user);
     const ke = await computeKE(acc);
-
-    const s = currentUserSettings || DEFAULT_SETTINGS;
-    const repRed = s.thresholds.reputation.red;
-    const repOrange = s.thresholds.reputation.orange;
 
     dash.innerHTML = `
         <div class="grid">
@@ -717,8 +525,7 @@ async function checkUser() {
     applyTooltips();
 
     // Color rules
-    const repStatus = rep <= repRed ? "danger" : rep < repOrange ? "warning" : "ok";
-    setCard("repCard", rep, repStatus);
+    setCard("repCard", rep, rep <= 10 ? "danger" : rep < 25 ? "warning" : "ok");
     setCard("ageCard", age, age < 31 ? "danger" : "ok");
     setCard("hpCard", hp.toFixed(3), hp < 100 ? "danger" : "ok");
 
@@ -842,8 +649,8 @@ async function checkUser() {
         `;
     }
 
-    // Apply user settings (hide cards, apply thresholds)
-    applySettingsToDashboard();
+    // APPLY USER VISIBILITY SETTINGS
+    applyBlockVisibility();
 }
 
 // ----------------------------------------------------
@@ -855,7 +662,9 @@ document.getElementById("username").addEventListener("keydown", e => {
     if (e.key === "Enter") checkUser();
 });
 
-// Initial top bar render
-renderTopBar();
+// KEYCHAIN EVENTS
+document.getElementById("kcLoginBtn").addEventListener("click", loginWithKeychain);
+document.getElementById("settingsBtn").addEventListener("click", renderSettingsPanel);
+document.getElementById("savePrefsBtn").addEventListener("click", saveUserPreferences);
 
 window.checkUser = checkUser;
