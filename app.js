@@ -386,6 +386,48 @@ async function computeKE(acc) {
 // ----------------------------------------------------
 async function keychainLogin() {
     if (!window.hive_keychain) {
+        alert("Hive Keychain is not installed.");
+        return;
+    }
+
+    // 1. Username ophalen zoals prompt() dat deed
+    const usernameInput = document.getElementById("loginUsername");
+    let username = usernameInput?.value?.trim().toLowerCase().replace("@", "");
+
+    if (!username) {
+        alert("Please enter your Hive username.");
+        return;
+    }
+
+    // 2. Check of account bestaat (oude code deed dit niet, maar is slim)
+    const acc = await getAccount(username);
+    if (!acc) {
+        alert("This Hive account does not exist.");
+        return;
+    }
+
+    // 3. SignBuffer exact zoals jouw oude code
+    hive_keychain.requestSignBuffer(
+        username,
+        "login-" + Date.now(),
+        "Posting",
+        async (res) => {
+            if (res.success) {
+                loggedInUser = username;
+                currentUserSettings = loadUserSettings(loggedInUser);
+
+                renderTopBar();
+                applySettingsToDashboard();
+
+                await logLogin(loggedInUser);
+            } else {
+                alert("Login failed.");
+            }
+        }
+    );
+}
+
+    if (!window.hive_keychain) {
         alert("Hive Keychain extension not detected.");
         return;
     }
