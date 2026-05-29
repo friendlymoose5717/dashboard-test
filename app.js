@@ -678,6 +678,10 @@ document.getElementById("username").addEventListener("keydown", e => {
     if (e.key === "Enter") checkUser();
 });
 
+document.getElementById("settingsClose").addEventListener("click", () => {
+    document.getElementById("settingsPanel").style.display = "none";
+});
+
 // KEYCHAIN EVENTS
 document.getElementById("kcLoginBtn").addEventListener("click", loginWithKeychain);
 document.getElementById("settingsBtn").addEventListener("click", renderSettingsPanel);

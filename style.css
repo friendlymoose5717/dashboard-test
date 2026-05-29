@@ -171,3 +171,20 @@ button:hover {
 .error { color: #f87171; }
 .good { color: #4ade80; }
 .bad { color: #f87171; }
+
+/* ----------------------------------------------------
+   SETTINGS CLOSE X
+---------------------------------------------------- */
+
+#settingsClose {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    cursor: pointer;
+    font-size: 18px;
+    opacity: 0.7;
+}
+
+#settingsClose:hover {
+    opacity: 1;
+}
