@@ -192,3 +192,14 @@ button:hover {
 #settingsClose:hover {
     opacity: 1;
 }
+
+#logoutBtn {
+    background: #ef4444;
+    padding: 8px 12px;
+    border-radius: 6px;
+    margin-left: 10px;
+}
+
+#logoutBtn:hover {
+    background: #dc2626;
+}

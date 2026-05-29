@@ -116,6 +116,7 @@ async function loginWithKeychain() {
                 loggedInUser = username.toLowerCase();
                 document.getElementById("loginStatus").innerHTML =
                     "Logged in as @" + loggedInUser;
+					document.getElementById("logoutBtn").classList.remove("hidden");
 
                 await loadUserPreferences();
                 renderSettingsPanel();
@@ -156,6 +157,21 @@ async function loadUserPreferences() {
         }
     }
 }
+
+// ----------------------------------------------------
+// LOGOUT FUNCTION
+// ----------------------------------------------------
+
+function logoutUser() {
+    loggedInUser = null;
+    userPreferences = { hiddenBlocks: [] };
+
+    document.getElementById("loginStatus").innerHTML = "";
+    document.getElementById("logoutBtn").classList.add("hidden");
+
+    alert("You are now logged out.");
+}
+
 
 // ----------------------------------------------------
 // SAVE USER PREFERENCES TO CHAIN
@@ -687,4 +703,9 @@ document.getElementById("kcLoginBtn").addEventListener("click", loginWithKeychai
 document.getElementById("settingsBtn").addEventListener("click", renderSettingsPanel);
 document.getElementById("savePrefsBtn").addEventListener("click", saveUserPreferences);
 
+// LOGOUT BUTTON EVENT
+document.getElementById("logoutBtn").addEventListener("click", logoutUser);
+
+
 window.checkUser = checkUser;
+
