@@ -69,7 +69,14 @@ const anonId = () => {
 // KEYCHAIN LOGIN + SETTINGS GLOBALS
 // ----------------------------------------------------
 let loggedInUser = null;
-let userPreferences = { hiddenBlocks: [] };
+
+// ⭐ UPDATED: thresholds toegevoegd
+let userPreferences = { 
+    hiddenBlocks: [],
+    thresholds: {
+        reputation: { warning: 25, danger: 10 }
+    }
+};
 
 const BLOCKS = [
     "repCard", "ageCard", "hpCard", "delegationPctCard",
@@ -114,10 +121,11 @@ async function loginWithKeychain() {
         async (res) => {
             if (res.success) {
                 loggedInUser = username.toLowerCase();
-				logLogin(loggedInUser);
+                logLogin(loggedInUser);
+
                 document.getElementById("loginStatus").innerHTML =
                     "Logged in as @" + loggedInUser;
-					document.getElementById("logoutBtn").classList.remove("hidden");
+                document.getElementById("logoutBtn").classList.remove("hidden");
 
                 await loadUserPreferences();
                 renderSettingsPanel();
@@ -127,13 +135,15 @@ async function loginWithKeychain() {
         }
     );
 }
-
 // ----------------------------------------------------
 // LOAD USER PREFERENCES FROM CHAIN
 // ----------------------------------------------------
 async function loadUserPreferences() {
     if (!loggedInUser) {
-        userPreferences = { hiddenBlocks: [] };
+        userPreferences = { 
+            hiddenBlocks: [],
+            thresholds: { reputation: { warning: 25, danger: 10 } }
+        };
         return;
     }
 
@@ -143,14 +153,24 @@ async function loadUserPreferences() {
         1000
     ]);
 
-    userPreferences = { hiddenBlocks: [] };
+    // Default prefs
+    userPreferences = { 
+        hiddenBlocks: [],
+        thresholds: { reputation: { warning: 25, danger: 10 } }
+    };
 
     for (const h of history.reverse()) {
         const op = h[1].op;
         if (op[0] === "custom_json" && op[1].id === "hive-dashboard-prefs") {
             try {
                 const data = JSON.parse(op[1].json);
-                userPreferences = data.prefs || { hiddenBlocks: [] };
+                userPreferences = data.prefs || userPreferences;
+
+                // Ensure thresholds always exist
+                if (!userPreferences.thresholds) {
+                    userPreferences.thresholds = { reputation: { warning: 25, danger: 10 } };
+                }
+
                 return;
             } catch (e) {
                 console.error("Prefs parse error:", e);
@@ -162,17 +182,18 @@ async function loadUserPreferences() {
 // ----------------------------------------------------
 // LOGOUT FUNCTION
 // ----------------------------------------------------
-
 function logoutUser() {
     loggedInUser = null;
-    userPreferences = { hiddenBlocks: [] };
+    userPreferences = { 
+        hiddenBlocks: [],
+        thresholds: { reputation: { warning: 25, danger: 10 } }
+    };
 
     document.getElementById("loginStatus").innerHTML = "";
     document.getElementById("logoutBtn").classList.add("hidden");
 
     alert("You are now logged out.");
 }
-
 
 // ----------------------------------------------------
 // SAVE USER PREFERENCES TO CHAIN
@@ -181,6 +202,14 @@ async function saveUserPreferences() {
     if (!loggedInUser) {
         alert("Settings can only be saved when logged in with your Hive account.");
         return;
+    }
+
+    // ⭐ Save thresholds
+    if (document.getElementById("repWarning")) {
+        userPreferences.thresholds.reputation.warning =
+            parseInt(document.getElementById("repWarning").value);
+        userPreferences.thresholds.reputation.danger =
+            parseInt(document.getElementById("repDanger").value);
     }
 
     const json = {
@@ -216,15 +245,36 @@ function renderSettingsPanel() {
         return;
     }
 
-content.innerHTML = BLOCKS.map(id => `
-    <label style="display:block; margin:6px 0;">
-        <input type="checkbox" data-block="${id}"
-            ${!userPreferences.hiddenBlocks.includes(id) ? "checked" : ""}>
-        ${BLOCK_LABELS[id]}
-    </label>
-`).join("");
+    // Block visibility checkboxes
+    content.innerHTML = BLOCKS.map(id => `
+        <label style="display:block; margin:6px 0;">
+            <input type="checkbox" data-block="${id}"
+                ${!userPreferences.hiddenBlocks.includes(id) ? "checked" : ""}>
+            ${BLOCK_LABELS[id]}
+        </label>
+    `).join("");
 
-    content.querySelectorAll("input").forEach(chk => {
+    // ⭐ Add thresholds UI
+    content.innerHTML += `
+        <hr style="margin:15px 0; opacity:0.3;">
+
+        <h4>Thresholds</h4>
+
+        <div style="margin-bottom:10px;">
+            <strong>Reputation</strong><br>
+
+            <span style="color:#f59e0b; font-size:20px;">●</span>
+            <input type="number" id="repWarning" value="${userPreferences.thresholds.reputation.warning}"
+                   style="width:60px; margin-right:10px;">
+
+            <span style="color:#ef4444; font-size:20px;">●</span>
+            <input type="number" id="repDanger" value="${userPreferences.thresholds.reputation.danger}"
+                   style="width:60px;">
+        </div>
+    `;
+
+    // Checkbox listeners
+    content.querySelectorAll("input[type='checkbox']").forEach(chk => {
         chk.addEventListener("change", () => {
             const id = chk.dataset.block;
             if (!chk.checked) {
@@ -254,29 +304,6 @@ function applyBlockVisibility() {
             : "block";
     }
 }
-
-// ----------------------------------------------------
-// OUTGOING DELEGATIONS
-// ----------------------------------------------------
-async function getOutgoingDelegations(user) {
-    const delegs = await api("condenser_api.get_vesting_delegations", [user, "", 1000]);
-    const g = await loadGlobals();
-    const fund = parseFloat(g.total_vesting_fund_hive);
-    const shares = parseFloat(g.total_vesting_shares);
-
-    return delegs.map(d => ({
-        to: d.delegatee,
-        hp: parseFloat(d.vesting_shares) * (fund / shares)
-    }));
-}
-
-function applyTooltips() {
-    for (const [id, text] of Object.entries(TOOLTIPS)) {
-        const el = document.getElementById(id);
-        if (el) el.setAttribute("title", text);
-    }
-}
-
 // ----------------------------------------------------
 // LOGGING
 // ----------------------------------------------------
@@ -325,8 +352,6 @@ async function logLogin(username) {
     }
 }
 
-
-
 // ----------------------------------------------------
 // LOADERS
 // ----------------------------------------------------
@@ -345,6 +370,7 @@ async function loadBlacklist() {
         console.error("Blacklist load error:", e);
     }
 }
+
 // ----------------------------------------------------
 // ACCOUNT DATA
 // ----------------------------------------------------
@@ -578,8 +604,21 @@ async function checkUser() {
 
     applyTooltips();
 
-    // Color rules
-    setCard("repCard", rep, rep <= 10 ? "danger" : rep < 25 ? "warning" : "ok");
+    // ----------------------------------------------------
+    // ⭐ REPUTATION — APPLY USER THRESHOLDS
+    // ----------------------------------------------------
+    const repWarn = userPreferences.thresholds.reputation.warning;
+    const repDanger = userPreferences.thresholds.reputation.danger;
+
+    let repStatus = "ok";
+    if (rep <= repDanger) repStatus = "danger";
+    else if (rep < repWarn) repStatus = "warning";
+
+    setCard("repCard", rep, repStatus);
+
+    // ----------------------------------------------------
+    // OTHER COLOR RULES (unchanged)
+    // ----------------------------------------------------
     setCard("ageCard", age, age < 31 ? "danger" : "ok");
     setCard("hpCard", hp.toFixed(3), hp < 100 ? "danger" : "ok");
 
@@ -728,6 +767,4 @@ document.getElementById("savePrefsBtn").addEventListener("click", saveUserPrefer
 // LOGOUT BUTTON EVENT
 document.getElementById("logoutBtn").addEventListener("click", logoutUser);
 
-
 window.checkUser = checkUser;
-
