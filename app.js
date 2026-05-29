@@ -76,6 +76,22 @@ const BLOCKS = [
     "keCard", "postsCard", "commentsCard", "ratioCard",
     "transfersCard", "downvotesCard", "uniqueUpvotesCard", "blacklistCard"
 ];
+
+const BLOCK_LABELS = {
+    repCard: "Reputation",
+    ageCard: "Account age (days)",
+    hpCard: "Active HP",
+    delegationPctCard: "Delegation %",
+    keCard: "KE (Rewards/Stake Co-efficient)",
+    postsCard: "Posts (7d)",
+    commentsCard: "Comments (7d)",
+    ratioCard: "Comment/Post ratio",
+    transfersCard: "Outgoing transfers (30d)",
+    downvotesCard: "Incoming downvotes (30d)",
+    uniqueUpvotesCard: "Unique author upvotes (30d)",
+    blacklistCard: "Hivewatchers blacklist"
+};
+
 // ----------------------------------------------------
 // KEYCHAIN LOGIN
 // ----------------------------------------------------
@@ -183,13 +199,13 @@ function renderSettingsPanel() {
         return;
     }
 
-    content.innerHTML = BLOCKS.map(id => `
-        <label style="display:block; margin:6px 0;">
-            <input type="checkbox" data-block="${id}"
-                ${!userPreferences.hiddenBlocks.includes(id) ? "checked" : ""}>
-            ${id}
-        </label>
-    `).join("");
+content.innerHTML = BLOCKS.map(id => `
+    <label style="display:block; margin:6px 0;">
+        <input type="checkbox" data-block="${id}"
+            ${!userPreferences.hiddenBlocks.includes(id) ? "checked" : ""}>
+        ${BLOCK_LABELS[id]}
+    </label>
+`).join("");
 
     content.querySelectorAll("input").forEach(chk => {
         chk.addEventListener("change", () => {
