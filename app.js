@@ -606,7 +606,36 @@ if (!userPreferences.thresholds) {
         <div id="delegationTable"></div>
     `;
 
-    applyTooltips();
+/* app.js — checkUser() — kleurregels via requestAnimationFrame */
+applyTooltips();
+
+requestAnimationFrame(() => {
+
+    // REPUTATION — APPLY USER THRESHOLDS
+    const repWarn = userPreferences.thresholds.reputation.warning;
+    const repDanger = userPreferences.thresholds.reputation.danger;
+
+    let repStatus = "ok";
+    if (rep <= repDanger) repStatus = "danger";
+    else if (rep < repWarn) repStatus = "warning";
+
+    setCard("repCard", rep, repStatus);
+
+    // OTHER COLOR RULES
+    setCard("ageCard", age, age < 31 ? "danger" : "ok");
+    setCard("hpCard", hp.toFixed(3), hp < 100 ? "danger" : "ok");
+
+    setCard("delegationPctCard", dPct.toFixed(1) + "%", dPct > 50 ? "danger" : dPct > 25 ? "warning" : "ok");
+
+    setCard("blacklistCard", isBL ? "YES" : "NO", isBL ? "danger" : "ok");
+
+    const keStatus =
+        ke.krampus < 2 ? "ok" :
+        ke.krampus < 5 ? "warning" :
+        "danger";
+
+    setCard("keCard", ke.krampus.toFixed(4), keStatus);
+});
 
     // ----------------------------------------------------
     // ⭐ REPUTATION — APPLY USER THRESHOLDS
