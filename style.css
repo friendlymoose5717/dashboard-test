@@ -1,0 +1,173 @@
+/* ----------------------------------------------------
+   GLOBAL
+---------------------------------------------------- */
+body {
+    font-family: Arial, sans-serif;
+    background: #111827;
+    color: #e5e7eb;
+    margin: 0;
+    padding: 40px;
+}
+
+.container {
+    max-width: 900px;
+    margin: auto;
+}
+
+/* ----------------------------------------------------
+   SEARCH BAR
+---------------------------------------------------- */
+input#username {
+    width: 70%;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #3b82f6;
+    background: #1e3a8a;      /* helder blauw */
+    color: #e5e7eb;
+    outline: none;
+    transition: 0.2s;
+}
+
+input#username::placeholder {
+    color: #cbd5e1;
+}
+
+input#username:focus {
+    background: #1e40af;
+    border-color: #60a5fa;
+    box-shadow: 0 0 8px rgba(96,165,250,0.4);
+}
+
+button {
+    padding: 12px 16px;
+    border: none;
+    border-radius: 8px;
+    background: #3b82f6;
+    color: white;
+    cursor: pointer;
+    margin-left: 8px;
+    transition: 0.2s;
+}
+
+button:hover {
+    background: #2563eb;
+}
+
+/* ----------------------------------------------------
+   GRID + CARDS
+---------------------------------------------------- */
+.grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+    margin-top: 25px;
+}
+
+@media (max-width: 900px) {
+    .grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 600px) {
+    .grid { grid-template-columns: 1fr; }
+}
+
+.card {
+    background: #1f2937;
+    border-radius: 12px;
+    padding: 15px;
+    border: 1px solid #374151;
+    transition: 0.25s;
+}
+
+.card.ok {
+    background: #064e3b;
+    border-color: #10b981;
+}
+
+.card.warning {
+    background: #f37616 ;
+    border-color: #f97316;
+}
+
+.card.danger {
+    background: #7f1d1d;
+    border-color: #ef4444;
+}
+
+.card.loading {
+    background: #1f2937;
+    border-color: #374151;
+    opacity: 0.6;
+}
+
+.label {
+    font-size: 12px;
+    opacity: 0.7;
+}
+
+.value {
+    font-size: 22px;
+    margin-top: 6px;
+    font-weight: bold;
+}
+
+/* ----------------------------------------------------
+   TABLES — COOL DARK THEME
+---------------------------------------------------- */
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #0d1628;          /* diepe blauwgrijs */
+    border-radius: 10px;
+    overflow: hidden;
+    margin-top: 20px;
+    box-shadow: 0 0 14px rgba(0,0,0,0.45);
+}
+
+/* HEADER ROW */
+.data-table thead th {
+    background: #1b2b4a;          /* donkerblauw */
+    color: #e5e7eb;
+    padding: 12px;
+    font-size: 1.1em;
+    text-align: left;
+    border-bottom: 1px solid #2c3e5f;
+}
+
+/* BODY CELLS */
+.data-table td,
+.data-table th {
+    padding: 10px 12px;
+    border-bottom: 1px solid #1a2438;
+}
+
+/* ODD ROWS */
+.data-table tbody tr:nth-child(odd) {
+    background: #111c30;          /* donkerder */
+}
+
+/* EVEN ROWS */
+.data-table tbody tr:nth-child(even) {
+    background: #162238;          /* iets lichter */
+}
+
+/* HOVER */
+.data-table tbody tr:hover {
+    background: #1f2f4a;          /* helder maar subtiel */
+}
+
+/* DANGER ROW — amber/oranje ipv rood */
+.data-table .danger-row td {
+    background: #3a2a12;          /* warm donker amber */
+    color: #fbbf24;               /* amber-300 */
+    font-weight: 600;
+}
+
+
+/* ----------------------------------------------------
+   MISC
+---------------------------------------------------- */
+.hidden { display: none; }
+.error { color: #f87171; }
+.good { color: #4ade80; }
+.bad { color: #f87171; }
