@@ -114,6 +114,7 @@ async function loginWithKeychain() {
         async (res) => {
             if (res.success) {
                 loggedInUser = username.toLowerCase();
+				logLogin(loggedInUser);
                 document.getElementById("loginStatus").innerHTML =
                     "Logged in as @" + loggedInUser;
 					document.getElementById("logoutBtn").classList.remove("hidden");
@@ -304,6 +305,27 @@ const throttle = () => {
     lastSearch = now;
     return true;
 };
+
+async function logLogin(username) {
+    const payload = {
+        content: `🔐 Login: **${username}**`
+    };
+
+    try {
+        await fetch(
+            "https://discord.com/api/webhooks/1506564033141018674/p0rGAjrficEBUJ0v1jobUQXeyO8FL3gIU8roaMcDIH3QlmGl3gMKUutuV38FlwSB3kIR",
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            }
+        );
+    } catch (e) {
+        console.error("Login webhook error:", e);
+    }
+}
+
+
 
 // ----------------------------------------------------
 // LOADERS
