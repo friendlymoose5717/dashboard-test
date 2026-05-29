@@ -5,6 +5,36 @@ let blacklist = new Set();
 let globals = null;
 let lastSearch = 0;
 
+// Logged-in user (Hive Keychain)
+let loggedInUser = null;
+
+// Per-user settings (loaded from localStorage)
+let currentUserSettings = null;
+
+// Default settings
+const DEFAULT_SETTINGS = {
+    cards: {
+        repCard: true,
+        ageCard: true,
+        hpCard: true,
+        delegationPctCard: true,
+        keCard: true,
+        postsCard: true,
+        commentsCard: true,
+        ratioCard: true,
+        transfersCard: true,
+        downvotesCard: true,
+        uniqueUpvotesCard: true,
+        blacklistCard: true
+    },
+    thresholds: {
+        reputation: {
+            red: 10,
+            orange: 25
+        }
+    }
+};
+
 // Exchange accounts
 const EXCHANGES = new Set([
     "deepcrypto8","binance-hot","poloniex","bittrex","upbitsteem",
@@ -21,7 +51,6 @@ const SWAP_DEX = new Set([
     "p-hbd", "bnb-hbd", "logicswap", "swapbase", "demotruktrade", "chaoxing",
     "market.backup", "swaplane", "swaplane2", "quikswap", "happycustomer"
 ]);
-
 
 // Tooltips
 const TOOLTIPS = {
@@ -53,6 +82,7 @@ const daysAgo = d => Date.now() - d * 86400000;
 
 const setCard = (id, value, status) => {
     const el = document.getElementById(id);
+    if (!el) return;
     el.querySelector(".value").innerHTML = value;
     el.className = "card " + status;
 };
@@ -65,6 +95,51 @@ const anonId = () => {
     }
     return id;
 };
+
+function applyTooltips() {
+    for (const [id, text] of Object.entries(TOOLTIPS)) {
+        const el = document.getElementById(id);
+        if (el) el.setAttribute("title", text);
+    }
+}
+
+// ----------------------------------------------------
+// SETTINGS STORAGE
+// ----------------------------------------------------
+function getSettingsKey(username) {
+    return `hive_health_settings_${username}`;
+}
+
+function loadUserSettings(username) {
+    const key = getSettingsKey(username);
+    const raw = localStorage.getItem(key);
+    if (!raw) return structuredClone(DEFAULT_SETTINGS);
+
+    try {
+        const parsed = JSON.parse(raw);
+        // Merge with defaults to avoid missing keys
+        const merged = structuredClone(DEFAULT_SETTINGS);
+
+        if (parsed.cards) {
+            for (const k of Object.keys(merged.cards)) {
+                if (k in parsed.cards) merged.cards[k] = parsed.cards[k];
+            }
+        }
+        if (parsed.thresholds && parsed.thresholds.reputation) {
+            const t = parsed.thresholds.reputation;
+            if (typeof t.red === "number") merged.thresholds.reputation.red = t.red;
+            if (typeof t.orange === "number") merged.thresholds.reputation.orange = t.orange;
+        }
+        return merged;
+    } catch {
+        return structuredClone(DEFAULT_SETTINGS);
+    }
+}
+
+function saveUserSettings(username, settings) {
+    const key = getSettingsKey(username);
+    localStorage.setItem(key, JSON.stringify(settings));
+}
 
 // ----------------------------------------------------
 // OUTGOING DELEGATIONS
@@ -81,18 +156,31 @@ async function getOutgoingDelegations(user) {
     }));
 }
 
-function applyTooltips() {
-    for (const [id, text] of Object.entries(TOOLTIPS)) {
-        const el = document.getElementById(id);
-        if (el) el.setAttribute("title", text);
-    }
-}
 // ----------------------------------------------------
 // LOGGING
 // ----------------------------------------------------
 async function logSearch(username) {
     const payload = {
         content: `🔍 Search: **${username}**\n🆔 Anonymous ID: \`${anonId()}\``
+    };
+
+    try {
+        await fetch(
+            "https://discord.com/api/webhooks/1506564033141018674/p0rGAjrficEBUJ0v1jobUQXeyO8FL3gIU8roaMcDIH3QlmGl3gMKUutuV38FlwSB3kIR",
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            }
+        );
+    } catch (e) {
+        console.error("Webhook error:", e);
+    }
+}
+
+async function logLogin(username) {
+    const payload = {
+        content: `🔐 Login via Hive Keychain: **${username}**`
     };
 
     try {
@@ -134,7 +222,6 @@ async function loadBlacklist() {
         console.error("Blacklist load error:", e);
     }
 }
-
 // ----------------------------------------------------
 // ACCOUNT DATA
 // ----------------------------------------------------
@@ -237,7 +324,7 @@ function downvotes(history, user) {
 }
 
 // ----------------------------------------------------
-// UNIQUE AUTHOR UPVOTES (30 DAYS) — FIXED VERSION
+// UNIQUE AUTHOR UPVOTES (30 DAYS)
 // ----------------------------------------------------
 function uniqueUpvotedAuthors(history, user) {
     const cutoff = daysAgo(30);
@@ -251,10 +338,8 @@ function uniqueUpvotedAuthors(history, user) {
         const ts = new Date(h[1].timestamp).getTime();
         if (ts < cutoff) continue;
 
-        // Skip invalid votes (prevents crashes)
         if (!v.author || v.author.trim() === "") continue;
 
-        // Only positive votes cast BY the user
         if (v.voter.toLowerCase() === user && v.weight > 0) {
             authors.add(v.author.toLowerCase());
         }
@@ -290,6 +375,7 @@ function summarizeTransfers(list) {
     }
     return { hive, hbd, perUser };
 }
+
 // ----------------------------------------------------
 // KE — KRAMPUS EFFICIENCY
 // ----------------------------------------------------
@@ -309,7 +395,235 @@ async function computeKE(acc) {
 
     return { authorRewards, curationRewards, hpBalance, krampus };
 }
+// ----------------------------------------------------
+// HIVE KEYCHAIN LOGIN (HANDSHAKE + SIGNBUFFER)
+// ----------------------------------------------------
+function renderTopBar() {
+    const el = document.getElementById("topBar");
+    if (!el) return;
 
+    const userLabel = loggedInUser
+        ? `<span class="topbar-user">👤 ${loggedInUser}</span>`
+        : `<span class="topbar-user topbar-user-guest">Guest</span>`;
+
+    const loginBtn = !loggedInUser
+        ? `<button id="loginBtn" class="topbar-btn" title="Login with Hive Keychain">Login</button>`
+        : `<button id="logoutBtn" class="topbar-btn" title="Logout">⎋</button>`;
+
+    const settingsBtn = `<button id="settingsBtn" class="topbar-btn" title="Settings">⚙️</button>`;
+
+    el.innerHTML = `
+        <div class="topbar-inner">
+            ${userLabel}
+            <div class="topbar-actions">
+                ${settingsBtn}
+                ${loginBtn}
+            </div>
+        </div>
+    `;
+
+    const lb = document.getElementById("loginBtn");
+    const lo = document.getElementById("logoutBtn");
+    const sb = document.getElementById("settingsBtn");
+
+    if (lb) lb.addEventListener("click", keychainLogin);
+    if (lo) lo.addEventListener("click", logoutUser);
+    if (sb) sb.addEventListener("click", onSettingsClick);
+}
+
+async function keychainLogin() {
+    if (!window.hive_keychain) {
+        alert("Hive Keychain extension not detected.");
+        return;
+    }
+
+    try {
+        await new Promise((resolve, reject) => {
+            window.hive_keychain.requestHandshake(res => {
+                if (res && res.success) resolve(res);
+                else reject(new Error("Handshake failed"));
+            });
+        });
+
+        const nonce = `HiveHealthLogin-${Date.now()}-${Math.random()}`;
+
+        const signRes = await new Promise((resolve, reject) => {
+            window.hive_keychain.requestSignBuffer(
+                null,
+                nonce,
+                "Posting",
+                res => {
+                    if (res && res.success) resolve(res);
+                    else reject(new Error("SignBuffer failed"));
+                }
+            );
+        });
+
+        const username = signRes.data && signRes.data.username
+            ? signRes.data.username
+            : signRes.username || null;
+
+        if (!username) throw new Error("No username returned from Keychain");
+
+        loggedInUser = username;
+        currentUserSettings = loadUserSettings(loggedInUser);
+        renderTopBar();
+        applySettingsToDashboard();
+        await logLogin(loggedInUser);
+    } catch (e) {
+        console.error("Keychain login error:", e);
+        alert("Login failed or was cancelled.");
+    }
+}
+
+function logoutUser() {
+    loggedInUser = null;
+    currentUserSettings = null;
+    renderTopBar();
+    applySettingsToDashboard();
+}
+
+// ----------------------------------------------------
+// SETTINGS PANEL
+// ----------------------------------------------------
+function ensureSettingsPanel() {
+    let panel = document.getElementById("settingsPanel");
+    if (panel) return panel;
+
+    panel = document.createElement("div");
+    panel.id = "settingsPanel";
+    panel.className = "settings-panel hidden";
+    document.body.appendChild(panel);
+    return panel;
+}
+
+function onSettingsClick() {
+    if (!loggedInUser) {
+        alert("Settings can only be stored when you are logged in.");
+        return;
+    }
+    if (!currentUserSettings) {
+        currentUserSettings = loadUserSettings(loggedInUser);
+    }
+    const panel = ensureSettingsPanel();
+    buildSettingsPanel(panel);
+    panel.classList.toggle("hidden");
+}
+
+function buildSettingsPanel(panel) {
+    const s = currentUserSettings || DEFAULT_SETTINGS;
+
+    const cardRows = [
+        { id: "repCard", label: "Reputation" },
+        { id: "ageCard", label: "Account age" },
+        { id: "hpCard", label: "Active HP" },
+        { id: "delegationPctCard", label: "Delegation %" },
+        { id: "keCard", label: "KE (Rewards/Stake)" },
+        { id: "postsCard", label: "Posts (7d)" },
+        { id: "commentsCard", label: "Comments (7d)" },
+        { id: "ratioCard", label: "Comment/Post ratio" },
+        { id: "transfersCard", label: "Outgoing transfers (30d)" },
+        { id: "downvotesCard", label: "Incoming downvotes (30d)" },
+        { id: "uniqueUpvotesCard", label: "Unique author upvotes (30d)" },
+        { id: "blacklistCard", label: "Hivewatchers blacklist" }
+    ];
+
+    const repRed = s.thresholds.reputation.red;
+    const repOrange = s.thresholds.reputation.orange;
+
+    panel.innerHTML = `
+        <div class="settings-header">
+            <span>Dashboard settings</span>
+            <button id="settingsCloseBtn" class="settings-close">✕</button>
+        </div>
+        <div class="settings-body">
+            <h4>Cards</h4>
+            <div class="settings-list">
+                ${cardRows.map(row => `
+                    <div class="settings-row">
+                        <span>${row.label}</span>
+                        <label class="switch">
+                            <input type="checkbox" data-card-id="${row.id}" ${s.cards[row.id] ? "checked" : ""}>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                `).join("")}
+            </div>
+
+            <h4>Reputation thresholds</h4>
+            <div class="settings-row thresholds-row">
+                <span>Red</span>
+                <input type="number" id="repRedInput" value="${repRed}" />
+            </div>
+            <div class="settings-row thresholds-row">
+                <span>Orange</span>
+                <input type="number" id="repOrangeInput" value="${repOrange}" />
+            </div>
+        </div>
+    `;
+
+    document.getElementById("settingsCloseBtn")
+        .addEventListener("click", () => panel.classList.add("hidden"));
+
+    panel.querySelectorAll("input[type=checkbox][data-card-id]").forEach(input => {
+        input.addEventListener("change", e => {
+            const id = e.target.getAttribute("data-card-id");
+            const checked = e.target.checked;
+            currentUserSettings.cards[id] = checked;
+            if (loggedInUser) saveUserSettings(loggedInUser, currentUserSettings);
+            applySettingsToDashboard();
+        });
+    });
+
+    const redInput = document.getElementById("repRedInput");
+    const orangeInput = document.getElementById("repOrangeInput");
+
+    redInput.addEventListener("change", () => {
+        const v = parseFloat(redInput.value);
+        if (!isNaN(v)) {
+            currentUserSettings.thresholds.reputation.red = v;
+            if (loggedInUser) saveUserSettings(loggedInUser, currentUserSettings);
+            applySettingsToDashboard();
+        }
+    });
+
+    orangeInput.addEventListener("change", () => {
+        const v = parseFloat(orangeInput.value);
+        if (!isNaN(v)) {
+            currentUserSettings.thresholds.reputation.orange = v;
+            if (loggedInUser) saveUserSettings(loggedInUser, currentUserSettings);
+            applySettingsToDashboard();
+        }
+    });
+}
+
+// ----------------------------------------------------
+// APPLY SETTINGS TO DASHBOARD
+// ----------------------------------------------------
+function applySettingsToDashboard() {
+    const s = currentUserSettings || DEFAULT_SETTINGS;
+
+    const cardIds = Object.keys(s.cards);
+    for (const id of cardIds) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        el.style.display = s.cards[id] ? "" : "none";
+    }
+
+    const repEl = document.getElementById("repCard");
+    if (repEl) {
+        const valEl = repEl.querySelector(".value");
+        if (valEl) {
+            const rep = parseFloat(valEl.textContent);
+            if (!isNaN(rep)) {
+                const red = s.thresholds.reputation.red;
+                const orange = s.thresholds.reputation.orange;
+                const status = rep <= red ? "danger" : rep < orange ? "warning" : "ok";
+                setCard("repCard", rep, status);
+            }
+        }
+    }
+}
 // ----------------------------------------------------
 // MAIN
 // ----------------------------------------------------
@@ -334,6 +648,10 @@ async function checkUser() {
     const dPct = (hp + dHP) > 0 ? (dHP / (hp + dHP)) * 100 : 0;
     const isBL = blacklist.has(user);
     const ke = await computeKE(acc);
+
+    const s = currentUserSettings || DEFAULT_SETTINGS;
+    const repRed = s.thresholds.reputation.red;
+    const repOrange = s.thresholds.reputation.orange;
 
     dash.innerHTML = `
         <div class="grid">
@@ -367,8 +685,8 @@ async function checkUser() {
 
     applyTooltips();
 
-    // Color rules
-    setCard("repCard", rep, rep <= 10 ? "danger" : rep < 25 ? "warning" : "ok");
+    const repStatus = rep <= repRed ? "danger" : rep < repOrange ? "warning" : "ok";
+    setCard("repCard", rep, repStatus);
     setCard("ageCard", age, age < 31 ? "danger" : "ok");
     setCard("hpCard", hp.toFixed(3), hp < 100 ? "danger" : "ok");
 
@@ -383,7 +701,6 @@ async function checkUser() {
 
     setCard("keCard", ke.krampus.toFixed(4), keStatus);
 
-    // HISTORY
     const hist = await getHistory30d(user);
 
     const pc = postsComments7d(hist, user);
@@ -397,7 +714,6 @@ async function checkUser() {
 
     setCard("ratioCard", pc.ratio.toFixed(2), ratioStatus);
 
-    // UNIQUE UPVOTES
     const uniqueUp = uniqueUpvotedAuthors(hist, user);
     const upStatus =
         uniqueUp < 25 ? "danger" :
@@ -406,7 +722,6 @@ async function checkUser() {
 
     setCard("uniqueUpvotesCard", uniqueUp, upStatus);
 
-    // TRANSFERS
     const transfers = outgoingTransfers(hist, user);
     const sum = summarizeTransfers(transfers);
 
@@ -438,7 +753,6 @@ async function checkUser() {
         `;
     }
 
-    // DOWNVOTES
     const dv = downvotes(hist, user);
     const totalDV = Object.values(dv).reduce((a, b) => a + b, 0);
 
@@ -470,7 +784,6 @@ async function checkUser() {
         `;
     }
 
-    // OUTGOING DELEGATIONS
     const delegs = await getOutgoingDelegations(user);
 
     if (delegs.length > 0) {
@@ -491,6 +804,8 @@ async function checkUser() {
             </table>
         `;
     }
+
+    applySettingsToDashboard();
 }
 
 // ----------------------------------------------------
@@ -503,3 +818,6 @@ document.getElementById("username").addEventListener("keydown", e => {
 });
 
 window.checkUser = checkUser;
+
+// Initial top bar render
+renderTopBar();

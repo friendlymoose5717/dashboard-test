@@ -22,6 +22,57 @@
         }
 
         /* ----------------------------------------------------
+           TOP BAR (LOGIN + SETTINGS)
+        ---------------------------------------------------- */
+        .topbar {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 10px 30px 0 30px;
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .topbar-inner {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .topbar-user {
+            opacity: 0.8;
+        }
+
+        .topbar-user-guest {
+            font-style: italic;
+        }
+
+        .topbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .topbar-btn {
+            padding: 4px 8px;
+            border-radius: 6px;
+            border: 1px solid #1f2937;
+            background: #111827;
+            color: #e5e7eb;
+            cursor: pointer;
+            font-size: 0.8rem;
+            opacity: 0.9;
+            transition: 0.2s;
+        }
+
+        .topbar-btn:hover {
+            background: #1f2937;
+            border-color: #3b82f6;
+            opacity: 1;
+        }
+
+        /* ----------------------------------------------------
            HEADER
         ---------------------------------------------------- */
         .header {
@@ -181,19 +232,138 @@
             font-weight: 600;
         }
 
-        /* ----------------------------------------------------
-           NEW: CENTERED + COLORED TABLE TITLES
-        ---------------------------------------------------- */
         .data-table thead tr:first-child th {
             text-align: center;
-            color: #93c5fd; /* lichtblauw */
+            color: #93c5fd;
             font-size: 1.25em;
             letter-spacing: 0.5px;
+        }
+
+        /* ----------------------------------------------------
+           SETTINGS PANEL
+        ---------------------------------------------------- */
+        .settings-panel {
+            position: fixed;
+            top: 60px;
+            right: 30px;
+            width: 260px;
+            background: #020617;
+            border: 1px solid #1f2937;
+            border-radius: 10px;
+            box-shadow: 0 0 18px rgba(0,0,0,0.6);
+            z-index: 1000;
+            padding: 10px 12px 14px 12px;
+            font-size: 0.9rem;
+        }
+
+        .settings-panel.hidden {
+            display: none;
+        }
+
+        .settings-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+
+        .settings-close {
+            background: transparent;
+            border: none;
+            color: #9ca3af;
+            cursor: pointer;
+            font-size: 0.9rem;
+            padding: 2px 6px;
+        }
+
+        .settings-close:hover {
+            color: #e5e7eb;
+        }
+
+        .settings-body h4 {
+            margin: 10px 0 6px 0;
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .settings-list {
+            max-height: 220px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .settings-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 4px 0;
+            gap: 8px;
+        }
+
+        .thresholds-row input {
+            width: 80px;
+            padding: 4px 6px;
+            border-radius: 6px;
+            border: 1px solid #374151;
+            background: #020617;
+            color: #e5e7eb;
+            font-size: 0.85rem;
+        }
+
+        /* Switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 34px;
+            height: 18px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #4b5563;
+            transition: .2s;
+            border-radius: 999px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 14px;
+            width: 14px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: .2s;
+            border-radius: 50%;
+        }
+
+        .switch input:checked + .slider {
+            background-color: #3b82f6;
+        }
+
+        .switch input:checked + .slider:before {
+            transform: translateX(16px);
         }
     </style>
 </head>
 
 <body>
+
+<div class="topbar">
+    <div id="topBar"></div>
+</div>
 
 <div class="container">
 
