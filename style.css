@@ -176,6 +176,10 @@ button:hover {
    SETTINGS CLOSE X
 ---------------------------------------------------- */
 
+#settingsPanel {
+    position: relative;
+}
+
 #settingsClose {
     position: absolute;
     top: 8px;
