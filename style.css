@@ -2,249 +2,172 @@
    GLOBAL
 ---------------------------------------------------- */
 body {
-    margin: 0;
-    padding: 0;
-    background: #111;
-    color: #eee;
     font-family: Arial, sans-serif;
+    background: #111827;
+    color: #e5e7eb;
+    margin: 0;
+    padding: 40px;
 }
 
-button {
-    cursor: pointer;
-}
-
-/* ----------------------------------------------------
-   TOPBAR
----------------------------------------------------- */
-.topbar {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    background: #1a1a1a;
-    padding: 10px 16px;
-    border-bottom: 1px solid #333;
-}
-
-.topbar-right {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.topbar-right input {
-    padding: 6px 8px;
-    border-radius: 4px;
-    border: 1px solid #444;
-    background: #222;
-    color: #eee;
-}
-
-#kcLoginBtn {
-    padding: 6px 10px;
-    background: #333;
-    border: 1px solid #555;
-    color: #eee;
-    border-radius: 4px;
-}
-
-#kcLoginBtn:hover {
-    background: #444;
-}
-
-#loginStatus {
-    font-size: 13px;
-    opacity: 0.8;
-}
-
-.icon-button {
-    background: transparent;
-    border: none;
-    color: #eee;
-    font-size: 20px;
-    padding: 4px;
-}
-
-.icon-button:hover {
-    color: #fff;
+.container {
+    max-width: 900px;
+    margin: auto;
 }
 
 /* ----------------------------------------------------
    SEARCH BAR
 ---------------------------------------------------- */
-.search-bar {
-    margin: 20px auto;
-    text-align: center;
+input#username {
+    width: 70%;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #3b82f6;
+    background: #1e3a8a;      /* helder blauw */
+    color: #e5e7eb;
+    outline: none;
+    transition: 0.2s;
 }
 
-.search-bar input {
-    padding: 8px 10px;
-    width: 220px;
-    border-radius: 4px;
-    border: 1px solid #444;
-    background: #222;
-    color: #eee;
+input#username::placeholder {
+    color: #cbd5e1;
 }
 
-.search-bar button {
-    padding: 8px 12px;
-    margin-left: 6px;
-    background: #333;
-    border: 1px solid #555;
-    color: #eee;
-    border-radius: 4px;
+input#username:focus {
+    background: #1e40af;
+    border-color: #60a5fa;
+    box-shadow: 0 0 8px rgba(96,165,250,0.4);
 }
 
-.search-bar button:hover {
-    background: #444;
+button {
+    padding: 12px 16px;
+    border: none;
+    border-radius: 8px;
+    background: #3b82f6;
+    color: white;
+    cursor: pointer;
+    margin-left: 8px;
+    transition: 0.2s;
+}
+
+button:hover {
+    background: #2563eb;
 }
 
 /* ----------------------------------------------------
-   DASHBOARD CENTERING
----------------------------------------------------- */
-#dashboard {
-    max-width: 1200px;
-    margin: 0 auto;
-}
-
-/* ----------------------------------------------------
-   GRID + CARDS (oude stijl)
+   GRID + CARDS
 ---------------------------------------------------- */
 .grid {
     display: grid;
-    justify-content: center;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 240px));
-    gap: 16px;
-    padding: 20px;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+    margin-top: 25px;
+}
+
+@media (max-width: 900px) {
+    .grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 600px) {
+    .grid { grid-template-columns: 1fr; }
 }
 
 .card {
-    background: #181818;
-    border-radius: 8px;
-    padding: 14px;
-    text-align: center;
-    border: 2px solid #333;
-    box-shadow: 0 0 10px rgba(0,0,0,0.4);
+    background: #1f2937;
+    border-radius: 12px;
+    padding: 15px;
+    border: 1px solid #374151;
+    transition: 0.25s;
 }
 
-.card .label {
-    font-size: 13px;
-    opacity: 0.75;
-}
-
-.card .value {
-    font-size: 26px;
-    font-weight: bold;
-    margin-top: 6px;
-}
-
-/* Status colors (oude stijl) */
 .card.ok {
-    border-color: #2ecc71;
-    box-shadow: 0 0 10px rgba(46, 204, 113, 0.4);
+    background: #064e3b;
+    border-color: #10b981;
 }
 
 .card.warning {
-    border-color: #f1c40f;
-    box-shadow: 0 0 10px rgba(241, 196, 15, 0.4);
+    background: #f37616 ;
+    border-color: #f97316;
 }
 
 .card.danger {
-    border-color: #e74c3c;
-    box-shadow: 0 0 10px rgba(231, 76, 60, 0.4);
+    background: #7f1d1d;
+    border-color: #ef4444;
 }
 
-.card.loading .value {
-    opacity: 0.5;
+.card.loading {
+    background: #1f2937;
+    border-color: #374151;
+    opacity: 0.6;
+}
+
+.label {
+    font-size: 12px;
+    opacity: 0.7;
+}
+
+.value {
+    font-size: 22px;
+    margin-top: 6px;
+    font-weight: bold;
 }
 
 /* ----------------------------------------------------
-   TABLES (oude stijl)
+   TABLES — COOL DARK THEME
 ---------------------------------------------------- */
 .data-table {
     width: 100%;
-    margin-top: 20px;
     border-collapse: collapse;
-    background: #141414;
+    background: #0d1628;          /* diepe blauwgrijs */
+    border-radius: 10px;
+    overflow: hidden;
+    margin-top: 20px;
+    box-shadow: 0 0 14px rgba(0,0,0,0.45);
 }
 
-.data-table th,
-.data-table td {
-    border: 1px solid #333;
-    padding: 6px 8px;
+/* HEADER ROW */
+.data-table thead th {
+    background: #1b2b4a;          /* donkerblauw */
+    color: #e5e7eb;
+    padding: 12px;
+    font-size: 1.1em;
+    text-align: left;
+    border-bottom: 1px solid #2c3e5f;
 }
 
+/* BODY CELLS */
+.data-table td,
 .data-table th {
-    background: #222;
-    color: #eee;
+    padding: 10px 12px;
+    border-bottom: 1px solid #1a2438;
 }
 
-.data-table td {
-    background: #1a1a1a;
-    color: #ddd;
+/* ODD ROWS */
+.data-table tbody tr:nth-child(odd) {
+    background: #111c30;          /* donkerder */
 }
 
-.danger-row {
-    background: rgba(231, 76, 60, 0.15);
+/* EVEN ROWS */
+.data-table tbody tr:nth-child(even) {
+    background: #162238;          /* iets lichter */
 }
+
+/* HOVER */
+.data-table tbody tr:hover {
+    background: #1f2f4a;          /* helder maar subtiel */
+}
+
+/* DANGER ROW — amber/oranje ipv rood */
+.data-table .danger-row td {
+    background: #3a2a12;          /* warm donker amber */
+    color: #fbbf24;               /* amber-300 */
+    font-weight: 600;
+}
+
 
 /* ----------------------------------------------------
-   SETTINGS POPUP
+   MISC
 ---------------------------------------------------- */
-.settings-modal {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.65);
-    z-index: 9999;
-}
-
-.settings-content {
-    position: absolute;
-    right: 20px;
-    top: 80px;
-    background: #1e1e1e;
-    padding: 20px;
-    border-radius: 6px;
-    width: 260px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-}
-
-.settings-content h2 {
-    margin-top: 0;
-    font-size: 18px;
-}
-
-.settings-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin: 6px 0;
-}
-
-.settings-close {
-    position: absolute;
-    top: 6px;
-    right: 6px;
-    background: transparent;
-    border: none;
-    color: #aaa;
-    font-size: 18px;
-}
-
-.settings-close:hover {
-    color: #fff;
-}
-
-.settings-save {
-    width: 100%;
-    padding: 8px 0;
-    margin-top: 12px;
-    background: #333;
-    border: 1px solid #555;
-    color: #eee;
-    border-radius: 4px;
-}
-
-.settings-save:hover {
-    background: #444;
-}
+.hidden { display: none; }
+.error { color: #f87171; }
+.good { color: #4ade80; }
+.bad { color: #f87171; }

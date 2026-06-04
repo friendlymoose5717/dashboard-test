@@ -15,7 +15,6 @@ const EXCHANGES = new Set([
     "mxchive","bdhivesteem"
 ]);
 
-// Swap / DEX accounts
 const SWAP_DEX = new Set([
     "honey-swap", "hiveswap", "hive-engine", "leodex", "uswap", "uswap.hbd",
     "keychain.swap", "graphene-swap", "swap.app", "capybaraexchange", "sw4p",
@@ -53,7 +52,6 @@ const daysAgo = d => Date.now() - d * 86400000;
 
 const setCard = (id, value, status) => {
     const el = document.getElementById(id);
-    if (!el) return;
     el.querySelector(".value").innerHTML = value;
     el.className = "card " + status;
 };
@@ -66,64 +64,9 @@ const anonId = () => {
     }
     return id;
 };
-// ----------------------------------------------------
-// DISCORD LOGGING
-// ----------------------------------------------------
-async function logSearch(username) {
-    const payload = {
-        content: `🔍 Search: **${username}**\n🆔 Anonymous ID: \`${anonId()}\``
-    };
-
-    try {
-        await fetch(
-            "https://discord.com/api/webhooks/1506564033141018674/p0rGAjrficEBUJ0v1jobUQXeyO8FL3gIU8roaMcDIH3QlmGl3gMKUutuV38FlwSB3kIR",
-            {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            }
-        );
-    } catch (e) {
-        console.error("Webhook error:", e);
-    }
-}
-
-async function logKeychainLogin(username) {
-    const payload = { content: `🔐 Keychain Login: **${username}**` };
-
-    try {
-        await fetch(
-            "https://discord.com/api/webhooks/1506564033141018674/p0rGAjrficEBUJ0v1jobUQXeyO8FL3gIU8roaMcDIH3QlmGl3gMKUutuV38FlwSB3kIR",
-            {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            }
-        );
-    } catch (e) {
-        console.error("Login webhook error:", e);
-    }
-}
-
-async function logKeychainLogout(username) {
-    const payload = { content: `🚪 Keychain Logout: **${username}**` };
-
-    try {
-        await fetch(
-            "https://discord.com/api/webhooks/1506564033141018674/p0rGAjrficEBUJ0v1jobUQXeyO8FL3gIU8roaMcDIH3QlmGl3gMKUutuV38FlwSB3kIR",
-            {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            }
-        );
-    } catch (e) {
-        console.error("Logout webhook error:", e);
-    }
-}
 
 // ----------------------------------------------------
-// KEYCHAIN LOGIN + SETTINGS
+// KEYCHAIN LOGIN + SETTINGS GLOBALS
 // ----------------------------------------------------
 let loggedInUser = null;
 let userPreferences = { hiddenBlocks: [] };
@@ -133,57 +76,10 @@ const BLOCKS = [
     "keCard", "postsCard", "commentsCard", "ratioCard",
     "transfersCard", "downvotesCard", "uniqueUpvotesCard", "blacklistCard"
 ];
-
-const BLOCK_LABELS = {
-    repCard: "Reputation",
-    ageCard: "Account age (days)",
-    hpCard: "Active HP",
-    delegationPctCard: "Delegation %",
-    keCard: "KE (Rewards/Stake Co-efficient)",
-    postsCard: "Posts (7d)",
-    commentsCard: "Comments (7d)",
-    ratioCard: "Comment/Post ratio",
-    transfersCard: "Outgoing transfers (30d)",
-    downvotesCard: "Incoming downvotes (30d)",
-    uniqueUpvotesCard: "Unique author upvotes (30d)",
-    blacklistCard: "Hivewatchers blacklist"
-};
-
-function updateLoginUI() {
-    const btn = document.getElementById("kcLoginBtn");
-    const status = document.getElementById("loginStatus");
-    const input = document.getElementById("loginUserInput");
-
-    if (loggedInUser) {
-        btn.textContent = "Keychain Logout";
-        status.textContent = "Logged in as @" + loggedInUser;
-        input.value = loggedInUser;
-        input.disabled = true;
-    } else {
-        btn.textContent = "Keychain Login";
-        status.textContent = "Not logged in";
-        input.disabled = false;
-    }
-}
-
 // ----------------------------------------------------
-// LOGIN / LOGOUT
+// KEYCHAIN LOGIN
 // ----------------------------------------------------
 async function loginWithKeychain() {
-
-    // LOGOUT
-    if (loggedInUser) {
-        logKeychainLogout(loggedInUser);
-
-        loggedInUser = null;
-        userPreferences = { hiddenBlocks: [] };
-        updateLoginUI();
-        applyBlockVisibility();
-        document.getElementById("settingsPanel").style.display = "none";
-        return;
-    }
-
-    // LOGIN
     if (!window.hive_keychain) {
         alert("Hive Keychain is not installed.");
         return;
@@ -202,21 +98,20 @@ async function loginWithKeychain() {
         async (res) => {
             if (res.success) {
                 loggedInUser = username.toLowerCase();
+                document.getElementById("loginStatus").innerHTML =
+                    "Logged in as @" + loggedInUser;
 
-                logKeychainLogin(loggedInUser);
-
-                updateLoginUI();
                 await loadUserPreferences();
                 renderSettingsPanel();
-                document.getElementById("settingsPanel").style.display = "none";
             } else {
                 alert("Login failed.");
             }
         }
     );
 }
+
 // ----------------------------------------------------
-// LOAD USER PREFS FROM CHAIN
+// LOAD USER PREFERENCES FROM CHAIN
 // ----------------------------------------------------
 async function loadUserPreferences() {
     if (!loggedInUser) {
@@ -247,11 +142,11 @@ async function loadUserPreferences() {
 }
 
 // ----------------------------------------------------
-// SAVE PREFS TO CHAIN
+// SAVE USER PREFERENCES TO CHAIN
 // ----------------------------------------------------
 async function saveUserPreferences() {
     if (!loggedInUser) {
-        alert("Settings can only be saved when logged in.");
+        alert("Settings can only be saved when logged in with your Hive account.");
         return;
     }
 
@@ -269,16 +164,13 @@ async function saveUserPreferences() {
         (res) => {
             if (!res.success) {
                 alert("Failed to save preferences.");
-            } else {
-                alert("Preferences saved.");
-                document.getElementById("settingsPanel").style.display = "none";
             }
         }
     );
 }
 
 // ----------------------------------------------------
-// SETTINGS PANEL
+// SETTINGS PANEL RENDER
 // ----------------------------------------------------
 function renderSettingsPanel() {
     const panel = document.getElementById("settingsPanel");
@@ -287,15 +179,15 @@ function renderSettingsPanel() {
     panel.style.display = "block";
 
     if (!loggedInUser) {
-        content.innerHTML = `<p>You must log in with Hive Keychain to save settings.</p>`;
+        content.innerHTML = `<p>Settings can only be saved when logged in with your Hive account.</p>`;
         return;
     }
 
     content.innerHTML = BLOCKS.map(id => `
-        <label class="settings-row">
+        <label style="display:block; margin:6px 0;">
             <input type="checkbox" data-block="${id}"
                 ${!userPreferences.hiddenBlocks.includes(id) ? "checked" : ""}>
-            <span>${BLOCK_LABELS[id] || id}</span>
+            ${id}
         </label>
     `).join("");
 
@@ -331,6 +223,57 @@ function applyBlockVisibility() {
 }
 
 // ----------------------------------------------------
+// OUTGOING DELEGATIONS
+// ----------------------------------------------------
+async function getOutgoingDelegations(user) {
+    const delegs = await api("condenser_api.get_vesting_delegations", [user, "", 1000]);
+    const g = await loadGlobals();
+    const fund = parseFloat(g.total_vesting_fund_hive);
+    const shares = parseFloat(g.total_vesting_shares);
+
+    return delegs.map(d => ({
+        to: d.delegatee,
+        hp: parseFloat(d.vesting_shares) * (fund / shares)
+    }));
+}
+
+function applyTooltips() {
+    for (const [id, text] of Object.entries(TOOLTIPS)) {
+        const el = document.getElementById(id);
+        if (el) el.setAttribute("title", text);
+    }
+}
+
+// ----------------------------------------------------
+// LOGGING
+// ----------------------------------------------------
+async function logSearch(username) {
+    const payload = {
+        content: `🔍 Search: **${username}**\n🆔 Anonymous ID: \`${anonId()}\``
+    };
+
+    try {
+        await fetch(
+            "https://discord.com/api/webhooks/1506564033141018674/p0rGAjrficEBUJ0v1jobUQXeyO8FL3gIU8roaMcDIH3QlmGl3gMKUutuV38FlwSB3kIR",
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            }
+        );
+    } catch (e) {
+        console.error("Webhook error:", e);
+    }
+}
+
+const throttle = () => {
+    const now = Date.now();
+    if (now - lastSearch < 1500) return false;
+    lastSearch = now;
+    return true;
+};
+
+// ----------------------------------------------------
 // LOADERS
 // ----------------------------------------------------
 async function loadGlobals() {
@@ -348,7 +291,6 @@ async function loadBlacklist() {
         console.error("Blacklist load error:", e);
     }
 }
-
 // ----------------------------------------------------
 // ACCOUNT DATA
 // ----------------------------------------------------
@@ -400,6 +342,7 @@ async function getHistory30d(user) {
     }
     return all;
 }
+
 // ----------------------------------------------------
 // METRICS
 // ----------------------------------------------------
@@ -452,6 +395,9 @@ function downvotes(history, user) {
     return map;
 }
 
+// ----------------------------------------------------
+// UNIQUE AUTHOR UPVOTES (30 DAYS)
+// ----------------------------------------------------
 function uniqueUpvotedAuthors(history, user) {
     const cutoff = daysAgo(30);
     const authors = new Set();
@@ -521,9 +467,8 @@ async function computeKE(acc) {
 
     return { authorRewards, curationRewards, hpBalance, krampus };
 }
-
 // ----------------------------------------------------
-// MAIN CHECK FUNCTION
+// MAIN
 // ----------------------------------------------------
 async function checkUser() {
     const user = document.getElementById("username").value.trim().toLowerCase();
@@ -535,70 +480,191 @@ async function checkUser() {
     dash.innerHTML = "Loading…";
 
     const acc = await getAccount(user);
-    if (!acc) {
-        dash.innerHTML = "Account not found.";
-        return;
-    }
+    if (!acc) return dash.innerHTML = "Account not found";
 
     if (!blacklist.size) await loadBlacklist();
 
     const rep = await getReputation(user);
     const age = Math.floor((Date.now() - new Date(acc.created)) / 86400000);
     const hp = await getHP(acc);
-    const delegatedHP = await getDelegatedHP(acc);
-    const delegationPct = hp > 0 ? (delegatedHP / hp) * 100 : 0;
-
+    const dHP = await getDelegatedHP(acc);
+    const dPct = (hp + dHP) > 0 ? (dHP / (hp + dHP)) * 100 : 0;
+    const isBL = blacklist.has(user);
     const ke = await computeKE(acc);
-
-    const history = await getHistory30d(user);
-    const pc = postsComments7d(history, user);
-    const dv = downvotes(history, user);
-    const uniqueUpvotes = uniqueUpvotedAuthors(history, user);
-
-    const transfers = outgoingTransfers(history, user);
-    const transferSummary = summarizeTransfers(transfers);
-
-    const delegations = await getOutgoingDelegations(user);
-
-    const isBlacklisted = blacklist.has(user);
 
     dash.innerHTML = `
         <div class="grid">
-            <div id="repCard" class="card"><div class="label">Reputation</div><div class="value">${rep.toFixed(2)}</div></div>
-            <div id="ageCard" class="card"><div class="label">Account age (days)</div><div class="value">${age}</div></div>
-            <div id="hpCard" class="card"><div class="label">Active HP</div><div class="value">${hp.toFixed(3)}</div></div>
-            <div id="delegationPctCard" class="card"><div class="label">Delegation %</div><div class="value">${delegationPct.toFixed(1)}%</div></div>
-            <div id="keCard" class="card"><div class="label">KE</div><div class="value">${ke.krampus.toFixed(4)}</div></div>
-            <div id="postsCard" class="card"><div class="label">Posts (7d)</div><div class="value">${pc.posts}</div></div>
-            <div id="commentsCard" class="card"><div class="label">Comments (7d)</div><div class="value">${pc.comments}</div></div>
-            <div id="ratioCard" class="card"><div class="label">Comment/Post ratio</div><div class="value">${pc.ratio.toFixed(2)}</div></div>
-            <div id="transfersCard" class="card"><div class="label">Outgoing transfers (30d)</div><div class="value">${transferSummary.hive.toFixed(3)} HIVE<br>${transferSummary.hbd.toFixed(3)} HBD</div></div>
-            <div id="downvotesCard" class="card"><div class="label">Incoming downvotes (30d)</div><div class="value">${Object.values(dv).reduce((a,b)=>a+b,0)}</div></div>
-            <div id="uniqueUpvotesCard" class="card"><div class="label">Unique author upvotes (30d)</div><div class="value">${uniqueUpvotes}</div></div>
-            <div id="blacklistCard" class="card"><div class="label">Hivewatchers blacklist</div><div class="value">${isBlacklisted ? "YES" : "NO"}</div></div>
+            <div class="card" id="repCard"><div class="label">Reputation</div><div class="value">${rep}</div></div>
+            <div class="card" id="ageCard"><div class="label">Account age (days)</div><div class="value">${age}</div></div>
+            <div class="card" id="hpCard"><div class="label">Active HP</div><div class="value">${hp.toFixed(3)}</div></div>
+
+            <div class="card" id="delegationPctCard"><div class="label">Delegation %</div><div class="value">${dPct.toFixed(1)}%</div></div>
+
+            <div class="card" id="keCard"><div class="label">KE (Rewards/Stake Co-efficient)</div><div class="value">${ke.krampus.toFixed(4)}</div></div>
+
+            <div class="card loading" id="postsCard"><div class="label">Posts (7d)</div><div class="value">Loading…</div></div>
+            <div class="card loading" id="commentsCard"><div class="label">Comments (7d)</div><div class="value">Loading…</div></div>
+            <div class="card loading" id="ratioCard"><div class="label">Comment/Post ratio</div><div class="value">Loading…</div></div>
+
+            <div class="card loading" id="transfersCard"><div class="label">Outgoing transfers (30d)</div><div class="value">Loading…</div></div>
+            <div class="card loading" id="downvotesCard"><div class="label">Incoming downvotes (30d)</div><div class="value">Loading…</div></div>
+
+            <div class="card loading" id="uniqueUpvotesCard">
+                <div class="label">Unique author upvotes (30d)</div>
+                <div class="value">Loading…</div>
+            </div>
+
+            <div class="card" id="blacklistCard"><div class="label">Hivewatchers blacklist</div><div class="value">${isBL ? "YES" : "NO"}</div></div>
         </div>
 
-        <h3>Incoming downvotes (30d)</h3>
-        <table class="data-table">
-            <tr><th>User</th><th>Count</th></tr>
-            ${Object.entries(dv).map(([u,c]) => `
-                <tr class="${c > 0 ? "danger-row" : ""}">
-                    <td>${u}</td><td>${c}</td>
-                </tr>
-            `).join("")}
-        </table>
-
-        <h3>Outgoing delegations</h3>
-        <table class="data-table">
-            <tr><th>Delegatee</th><th>HP delegated</th></tr>
-            ${delegations.map(d => `
-                <tr>
-                    <td>${d.to}</td><td>${d.hp.toFixed(3)}</td>
-                </tr>
-            `).join("")}
-        </table>
+        <div id="transferTable"></div>
+        <div id="downvoteTable"></div>
+        <div id="delegationTable"></div>
     `;
 
     applyTooltips();
+
+    // Color rules
+    setCard("repCard", rep, rep <= 10 ? "danger" : rep < 25 ? "warning" : "ok");
+    setCard("ageCard", age, age < 31 ? "danger" : "ok");
+    setCard("hpCard", hp.toFixed(3), hp < 100 ? "danger" : "ok");
+
+    setCard("delegationPctCard", dPct.toFixed(1) + "%", dPct > 50 ? "danger" : dPct > 25 ? "warning" : "ok");
+
+    setCard("blacklistCard", isBL ? "YES" : "NO", isBL ? "danger" : "ok");
+
+    const keStatus =
+        ke.krampus < 2 ? "ok" :
+        ke.krampus < 5 ? "warning" :
+        "danger";
+
+    setCard("keCard", ke.krampus.toFixed(4), keStatus);
+
+    // HISTORY
+    const hist = await getHistory30d(user);
+
+    const pc = postsComments7d(hist, user);
+    setCard("postsCard", pc.posts, pc.posts > 10 ? "danger" : pc.posts >= 8 ? "warning" : "ok");
+    setCard("commentsCard", pc.comments, pc.comments < 7 ? "danger" : pc.comments < 14 ? "warning" : "ok");
+
+    const ratioStatus =
+        pc.posts === 0 ? "ok" :
+        pc.ratio < 0 ? "warning" :
+        "ok";
+
+    setCard("ratioCard", pc.ratio.toFixed(2), ratioStatus);
+
+    // UNIQUE UPVOTES
+    const uniqueUp = uniqueUpvotedAuthors(hist, user);
+    const upStatus =
+        uniqueUp < 25 ? "danger" :
+        uniqueUp < 100 ? "warning" :
+        "ok";
+
+    setCard("uniqueUpvotesCard", uniqueUp, upStatus);
+
+    // TRANSFERS
+    const transfers = outgoingTransfers(hist, user);
+    const sum = summarizeTransfers(transfers);
+
+    const tStatus = (sum.hive > 10 || sum.hbd > 5) ? "warning" : "ok";
+    setCard("transfersCard", `${sum.hive.toFixed(3)} HIVE<br>${sum.hbd.toFixed(3)} HBD`, tStatus);
+
+    if (Object.keys(sum.perUser).length) {
+        document.getElementById("transferTable").innerHTML = `
+            <table class="data-table">
+                <thead>
+                    <tr><th colspan="2">Outgoing transfers (30d)</th></tr>
+                    <tr><th>Recipient</th><th>Total</th></tr>
+                </thead>
+                <tbody>
+                    ${Object.entries(sum.perUser).map(([to, v]) => `
+                        <tr class="danger-row">
+                           <td>${
+    EXCHANGES.has(to.toLowerCase()) 
+        ? to + " (exchange)" 
+        : SWAP_DEX.has(to.toLowerCase())
+            ? to + " (swap/dex)"
+            : to
+}</td>
+                            <td>${v.hive.toFixed(3)} HIVE<br>${v.hbd.toFixed(3)} HBD</td>
+                        </tr>
+                    `).join("")}
+                </tbody>
+            </table>
+        `;
+    }
+
+    // DOWNVOTES
+    const dv = downvotes(hist, user);
+    const totalDV = Object.values(dv).reduce((a, b) => a + b, 0);
+
+    const dvStatus =
+        totalDV >= 10 ? "danger" :
+        totalDV > 0 ? "warning" :
+        "ok";
+
+    setCard("downvotesCard", totalDV, dvStatus);
+
+    if (totalDV > 0) {
+        document.getElementById("downvoteTable").innerHTML = `
+            <table class="data-table">
+                <thead>
+                    <tr><th colspan="2">Incoming downvotes (30d)</th></tr>
+                    <tr><th>User</th><th>Count</th></tr>
+                </thead>
+                <tbody>
+                    ${Object.entries(dv)
+                        .sort((a, b) => b[1] - a[1])
+                        .map(([u, c]) => `
+                            <tr class="danger-row">
+                                <td>${u}</td>
+                                <td>${c}</td>
+                            </tr>
+                        `).join("")}
+                </tbody>
+            </table>
+        `;
+    }
+
+    // OUTGOING DELEGATIONS
+    const delegs = await getOutgoingDelegations(user);
+
+    if (delegs.length > 0) {
+        document.getElementById("delegationTable").innerHTML = `
+            <table class="data-table">
+                <thead>
+                    <tr><th colspan="2">Outgoing delegations</th></tr>
+                    <tr><th>Delegatee</th><th>HP delegated</th></tr>
+                </thead>
+                <tbody>
+                    ${delegs.map(d => `
+                        <tr class="danger-row">
+                            <td>${EXCHANGES.has(d.to.toLowerCase()) ? d.to + " (exchange)" : d.to}</td>
+                            <td>${d.hp.toFixed(3)} HP</td>
+                        </tr>
+                    `).join("")}
+                </tbody>
+            </table>
+        `;
+    }
+
+    // APPLY USER VISIBILITY SETTINGS
     applyBlockVisibility();
 }
+
+// ----------------------------------------------------
+// EVENTS
+// ----------------------------------------------------
+document.getElementById("checkBtn").addEventListener("click", checkUser);
+
+document.getElementById("username").addEventListener("keydown", e => {
+    if (e.key === "Enter") checkUser();
+});
+
+// KEYCHAIN EVENTS
+document.getElementById("kcLoginBtn").addEventListener("click", loginWithKeychain);
+document.getElementById("settingsBtn").addEventListener("click", renderSettingsPanel);
+document.getElementById("savePrefsBtn").addEventListener("click", saveUserPreferences);
+
+window.checkUser = checkUser;
