@@ -66,7 +66,6 @@ const anonId = () => {
     }
     return id;
 };
-
 // ----------------------------------------------------
 // DISCORD LOGGING
 // ----------------------------------------------------
@@ -216,7 +215,6 @@ async function loginWithKeychain() {
         }
     );
 }
-
 // ----------------------------------------------------
 // LOAD USER PREFS FROM CHAIN
 // ----------------------------------------------------
@@ -402,7 +400,6 @@ async function getHistory30d(user) {
     }
     return all;
 }
-
 // ----------------------------------------------------
 // METRICS
 // ----------------------------------------------------
@@ -526,6 +523,82 @@ async function computeKE(acc) {
 }
 
 // ----------------------------------------------------
-// MAIN
+// MAIN CHECK FUNCTION
 // ----------------------------------------------------
 async function checkUser() {
+    const user = document.getElementById("username").value.trim().toLowerCase();
+    if (!user || !throttle()) return;
+
+    logSearch(user);
+
+    const dash = document.getElementById("dashboard");
+    dash.innerHTML = "Loading…";
+
+    const acc = await getAccount(user);
+    if (!acc) {
+        dash.innerHTML = "Account not found.";
+        return;
+    }
+
+    if (!blacklist.size) await loadBlacklist();
+
+    const rep = await getReputation(user);
+    const age = Math.floor((Date.now() - new Date(acc.created)) / 86400000);
+    const hp = await getHP(acc);
+    const delegatedHP = await getDelegatedHP(acc);
+    const delegationPct = hp > 0 ? (delegatedHP / hp) * 100 : 0;
+
+    const ke = await computeKE(acc);
+
+    const history = await getHistory30d(user);
+    const pc = postsComments7d(history, user);
+    const dv = downvotes(history, user);
+    const uniqueUpvotes = uniqueUpvotedAuthors(history, user);
+
+    const transfers = outgoingTransfers(history, user);
+    const transferSummary = summarizeTransfers(transfers);
+
+    const delegations = await getOutgoingDelegations(user);
+
+    const isBlacklisted = blacklist.has(user);
+
+    dash.innerHTML = `
+        <div class="grid">
+            <div id="repCard" class="card"><div class="label">Reputation</div><div class="value">${rep.toFixed(2)}</div></div>
+            <div id="ageCard" class="card"><div class="label">Account age (days)</div><div class="value">${age}</div></div>
+            <div id="hpCard" class="card"><div class="label">Active HP</div><div class="value">${hp.toFixed(3)}</div></div>
+            <div id="delegationPctCard" class="card"><div class="label">Delegation %</div><div class="value">${delegationPct.toFixed(1)}%</div></div>
+            <div id="keCard" class="card"><div class="label">KE</div><div class="value">${ke.krampus.toFixed(4)}</div></div>
+            <div id="postsCard" class="card"><div class="label">Posts (7d)</div><div class="value">${pc.posts}</div></div>
+            <div id="commentsCard" class="card"><div class="label">Comments (7d)</div><div class="value">${pc.comments}</div></div>
+            <div id="ratioCard" class="card"><div class="label">Comment/Post ratio</div><div class="value">${pc.ratio.toFixed(2)}</div></div>
+            <div id="transfersCard" class="card"><div class="label">Outgoing transfers (30d)</div><div class="value">${transferSummary.hive.toFixed(3)} HIVE<br>${transferSummary.hbd.toFixed(3)} HBD</div></div>
+            <div id="downvotesCard" class="card"><div class="label">Incoming downvotes (30d)</div><div class="value">${Object.values(dv).reduce((a,b)=>a+b,0)}</div></div>
+            <div id="uniqueUpvotesCard" class="card"><div class="label">Unique author upvotes (30d)</div><div class="value">${uniqueUpvotes}</div></div>
+            <div id="blacklistCard" class="card"><div class="label">Hivewatchers blacklist</div><div class="value">${isBlacklisted ? "YES" : "NO"}</div></div>
+        </div>
+
+        <h3>Incoming downvotes (30d)</h3>
+        <table class="data-table">
+            <tr><th>User</th><th>Count</th></tr>
+            ${Object.entries(dv).map(([u,c]) => `
+                <tr class="${c > 0 ? "danger-row" : ""}">
+                    <td>${u}</td><td>${c}</td>
+                </tr>
+            `).join("")}
+        </table>
+
+        <h3>Outgoing delegations</h3>
+        <table class="data-table">
+            <tr><th>Delegatee</th><th>HP delegated</th></tr>
+            ${delegations.map(d => `
+                <tr>
+                    <td>${d.to}</td><td>${d.hp.toFixed(3)}</td>
+                </tr>
+            `).join("")}
+        </table>
+    `;
+
+    applyTooltips();
+    applyBlockVisibility();
+}
