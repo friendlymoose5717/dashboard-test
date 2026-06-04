@@ -15,6 +15,7 @@ const EXCHANGES = new Set([
     "mxchive","bdhivesteem"
 ]);
 
+// Swap / DEX accounts
 const SWAP_DEX = new Set([
     "honey-swap", "hiveswap", "hive-engine", "leodex", "uswap", "uswap.hbd",
     "keychain.swap", "graphene-swap", "swap.app", "capybaraexchange", "sw4p",
@@ -67,6 +68,62 @@ const anonId = () => {
 };
 
 // ----------------------------------------------------
+// DISCORD LOGGING
+// ----------------------------------------------------
+async function logSearch(username) {
+    const payload = {
+        content: `🔍 Search: **${username}**\n🆔 Anonymous ID: \`${anonId()}\``
+    };
+
+    try {
+        await fetch(
+            "https://discord.com/api/webhooks/1506564033141018674/p0rGAjrficEBUJ0v1jobUQXeyO8FL3gIU8roaMcDIH3QlmGl3gMKUutuV38FlwSB3kIR",
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            }
+        );
+    } catch (e) {
+        console.error("Webhook error:", e);
+    }
+}
+
+async function logKeychainLogin(username) {
+    const payload = { content: `🔐 Keychain Login: **${username}**` };
+
+    try {
+        await fetch(
+            "https://discord.com/api/webhooks/1506564033141018674/p0rGAjrficEBUJ0v1jobUQXeyO8FL3gIU8roaMcDIH3QlmGl3gMKUutuV38FlwSB3kIR",
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            }
+        );
+    } catch (e) {
+        console.error("Login webhook error:", e);
+    }
+}
+
+async function logKeychainLogout(username) {
+    const payload = { content: `🚪 Keychain Logout: **${username}**` };
+
+    try {
+        await fetch(
+            "https://discord.com/api/webhooks/1506564033141018674/p0rGAjrficEBUJ0v1jobUQXeyO8FL3gIU8roaMcDIH3QlmGl3gMKUutuV38FlwSB3kIR",
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            }
+        );
+    } catch (e) {
+        console.error("Logout webhook error:", e);
+    }
+}
+
+// ----------------------------------------------------
 // KEYCHAIN LOGIN + SETTINGS
 // ----------------------------------------------------
 let loggedInUser = null;
@@ -78,7 +135,6 @@ const BLOCKS = [
     "transfersCard", "downvotesCard", "uniqueUpvotesCard", "blacklistCard"
 ];
 
-// ✔ Mooie labels voor settings popup
 const BLOCK_LABELS = {
     repCard: "Reputation",
     ageCard: "Account age (days)",
@@ -115,8 +171,11 @@ function updateLoginUI() {
 // LOGIN / LOGOUT
 // ----------------------------------------------------
 async function loginWithKeychain() {
+
+    // LOGOUT
     if (loggedInUser) {
-        // logout
+        logKeychainLogout(loggedInUser);
+
         loggedInUser = null;
         userPreferences = { hiddenBlocks: [] };
         updateLoginUI();
@@ -125,6 +184,7 @@ async function loginWithKeychain() {
         return;
     }
 
+    // LOGIN
     if (!window.hive_keychain) {
         alert("Hive Keychain is not installed.");
         return;
@@ -143,6 +203,9 @@ async function loginWithKeychain() {
         async (res) => {
             if (res.success) {
                 loggedInUser = username.toLowerCase();
+
+                logKeychainLogin(loggedInUser);
+
                 updateLoginUI();
                 await loadUserPreferences();
                 renderSettingsPanel();
@@ -270,57 +333,6 @@ function applyBlockVisibility() {
 }
 
 // ----------------------------------------------------
-// OUTGOING DELEGATIONS
-// ----------------------------------------------------
-async function getOutgoingDelegations(user) {
-    const delegs = await api("condenser_api.get_vesting_delegations", [user, "", 1000]);
-    const g = await loadGlobals();
-    const fund = parseFloat(g.total_vesting_fund_hive);
-    const shares = parseFloat(g.total_vesting_shares);
-
-    return delegs.map(d => ({
-        to: d.delegatee,
-        hp: parseFloat(d.vesting_shares) * (fund / shares)
-    }));
-}
-
-function applyTooltips() {
-    for (const [id, text] of Object.entries(TOOLTIPS)) {
-        const el = document.getElementById(id);
-        if (el) el.setAttribute("title", text);
-    }
-}
-
-// ----------------------------------------------------
-// LOGGING
-// ----------------------------------------------------
-async function logSearch(username) {
-    const payload = {
-        content: `🔍 Search: **${username}**\n🆔 Anonymous ID: \`${anonId()}\``
-    };
-
-    try {
-        await fetch(
-            "https://discord.com/api/webhooks/1506564033141018674/p0rGAjrficEBUJ0v1jobUQXeyO8FL3gIU8roaMcDIH3QlmGl3gMKUutuV38FlwSB3kIR",
-            {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            }
-        );
-    } catch (e) {
-        console.error("Webhook error:", e);
-    }
-}
-
-const throttle = () => {
-    const now = Date.now();
-    if (now - lastSearch < 1500) return false;
-    lastSearch = now;
-    return true;
-};
-
-// ----------------------------------------------------
 // LOADERS
 // ----------------------------------------------------
 async function loadGlobals() {
@@ -363,175 +375,4 @@ async function getHP(acc) {
 async function getDelegatedHP(acc) {
     const g = await loadGlobals();
     const fund = parseFloat(g.total_vesting_fund_hive);
-    const shares = parseFloat(g.total_vesting_shares);
-    const ds = parseFloat(acc.delegated_vesting_shares);
-    return ds * (fund / shares);
-}
-
-// ----------------------------------------------------
-// HISTORY (30 DAYS)
-// ----------------------------------------------------
-async function getHistory30d(user) {
-    const limit = 1000;
-    let from = -1;
-    const cutoff = daysAgo(30);
-    const all = [];
-
-    while (true) {
-        const batch = await api("condenser_api.get_account_history", [user, from, limit]);
-        if (!batch?.length) break;
-
-        for (const h of batch) {
-            const ts = new Date(h[1].timestamp).getTime();
-            if (ts < cutoff) return all;
-            all.push(h);
-        }
-        from = batch[0][0] - 1;
-    }
-    return all;
-}
-
-// ----------------------------------------------------
-// METRICS
-// ----------------------------------------------------
-function postsComments7d(history, user) {
-    const cutoff = daysAgo(7);
-    let posts = 0, comments = 0;
-    const seenPermlinks = new Set();
-
-    for (const h of history) {
-        const op = h[1].op;
-        if (!op || op[0] !== "comment") continue;
-
-        const c = op[1];
-        if (c.author.toLowerCase() !== user) continue;
-
-        const ts = new Date(h[1].timestamp).getTime();
-        if (ts < cutoff) continue;
-
-        if (seenPermlinks.has(c.permlink)) continue;
-        seenPermlinks.add(c.permlink);
-
-        const isPost =
-            c.parent_author === "" &&
-            c.title.trim().length > 0 &&
-            !c.permlink.startsWith("re-");
-
-        if (isPost) posts++;
-        else comments++;
-    }
-
-    return { posts, comments, ratio: posts ? comments / posts : 0 };
-}
-
-function downvotes(history, user) {
-    const cutoff = daysAgo(30);
-    const map = {};
-
-    for (const h of history) {
-        const op = h[1].op;
-        if (!op || op[0] !== "vote") continue;
-
-        const v = op[1];
-        const ts = new Date(h[1].timestamp).getTime();
-        if (ts < cutoff) continue;
-
-        if (v.weight < 0 && v.author.toLowerCase() === user) {
-            map[v.voter] = (map[v.voter] || 0) + 1;
-        }
-    }
-    return map;
-}
-
-// UNIQUE AUTHOR UPVOTES (30 DAYS)
-function uniqueUpvotedAuthors(history, user) {
-    const cutoff = daysAgo(30);
-    const authors = new Set();
-
-    for (const h of history) {
-        const op = h[1].op;
-        if (!op || op[0] !== "vote") continue;
-
-        const v = op[1];
-        const ts = new Date(h[1].timestamp).getTime();
-        if (ts < cutoff) continue;
-
-        if (!v.author || v.author.trim() === "") continue;
-
-        if (v.voter.toLowerCase() === user && v.weight > 0) {
-            authors.add(v.author.toLowerCase());
-        }
-    }
-
-    return authors.size;
-}
-
-// ----------------------------------------------------
-// TRANSFERS
-// ----------------------------------------------------
-function outgoingTransfers(history, user) {
-    return history
-        .filter(h => h[1].op[0] === "transfer")
-        .map(h => h[1].op[1])
-        .filter(t => t.from.toLowerCase() === user);
-}
-
-function summarizeTransfers(list) {
-    let hive = 0, hbd = 0;
-    const perUser = {};
-
-    for (const t of list) {
-        const [amt, cur] = t.amount.split(" ");
-        const v = parseFloat(amt);
-
-        if (cur === "HIVE") hive += v;
-        if (cur === "HBD") hbd += v;
-
-        if (!perUser[t.to]) perUser[t.to] = { hive: 0, hbd: 0 };
-        if (cur === "HIVE") perUser[t.to].hive += v;
-        if (cur === "HBD") perUser[t.to].hbd += v;
-    }
-    return { hive, hbd, perUser };
-}
-
-// ----------------------------------------------------
-// KE — KRAMPUS EFFICIENCY
-// ----------------------------------------------------
-async function computeKE(acc) {
-    const g = await loadGlobals();
-
-    const authorRewards = acc.posting_rewards / 1000;
-    const curationRewards = acc.curation_rewards / 1000;
-
-    const fund = parseFloat(g.total_vesting_fund_hive);
-    const shares = parseFloat(g.total_vesting_shares);
-    const vesting = parseFloat(acc.vesting_shares);
-
-    const hpBalance = shares ? (fund * vesting) / shares : 0;
-
-    const krampus = hpBalance ? (authorRewards + curationRewards) / hpBalance : -1;
-
-    return { authorRewards, curationRewards, hpBalance, krampus };
-}
-
-// ----------------------------------------------------
-// MAIN
-// ----------------------------------------------------
-async function checkUser() {
-    const user = document.getElementById("username").value.trim().toLowerCase();
-    if (!user || !throttle()) return;
-
-    logSearch(user);
-
-    const dash = document.getElementById("dashboard");
-    dash.innerHTML = "Loading…";
-
-    const acc = await getAccount(user);
-    if (!acc) return dash.innerHTML = "Account not found";
-
-    if (!blacklist.size) await loadBlacklist();
-
-    const rep = await getReputation(user);
-    const age = Math.floor((Date.now() - new Date(acc.created)) / 86400000);
-    const hp = await getHP(acc);
-    const dHP = await get
+    const shares
