@@ -5,15 +5,12 @@
     <title>Hive Account Health Dashboard</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <!-- Stylesheet -->
     <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
-    <!-- ----------------------------------------------------
-         TOPBAR (rechtsboven)
-    ---------------------------------------------------- -->
+    <!-- TOPBAR -->
     <header class="topbar">
         <div class="topbar-right">
             <input id="loginUserInput" type="text" placeholder="Hive username">
@@ -23,39 +20,27 @@
         </div>
     </header>
 
-    <!-- ----------------------------------------------------
-         SEARCH BAR
-    ---------------------------------------------------- -->
+    <!-- SEARCH BAR -->
     <div class="search-bar">
         <input id="username" type="text" placeholder="Account to check">
         <button id="checkBtn">Check</button>
     </div>
 
-    <!-- ----------------------------------------------------
-         DASHBOARD
-    ---------------------------------------------------- -->
+    <!-- DASHBOARD -->
     <div id="dashboard"></div>
 
-    <!-- ----------------------------------------------------
-         SETTINGS POPUP
-    ---------------------------------------------------- -->
+    <!-- SETTINGS POPUP -->
     <div id="settingsPanel" class="settings-modal">
         <div class="settings-content">
             <button id="settingsCloseBtn" class="settings-close">✕</button>
             <h2>Dashboard blocks</h2>
 
-            <div id="settingsContent">
-                <!-- checkboxes worden hier dynamisch ingevuld -->
-            </div>
+            <div id="settingsContent"></div>
 
             <button id="savePrefsBtn" class="settings-save">Save</button>
         </div>
     </div>
 
-    <!-- ----------------------------------------------------
-         SCRIPT
-    ---------------------------------------------------- -->
     <script src="app.js"></script>
-
 </body>
 </html>

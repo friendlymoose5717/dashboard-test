@@ -99,43 +99,58 @@ button {
 }
 
 /* ----------------------------------------------------
-   GRID + CARDS
+   DASHBOARD CENTERING
+---------------------------------------------------- */
+#dashboard {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* ----------------------------------------------------
+   GRID + CARDS (oude stijl)
 ---------------------------------------------------- */
 .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 12px;
+    justify-content: center;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 240px));
+    gap: 16px;
     padding: 20px;
 }
 
 .card {
-    background: #1e1e1e;
-    border-radius: 6px;
-    padding: 12px;
+    background: #181818;
+    border-radius: 8px;
+    padding: 14px;
+    text-align: center;
     border: 2px solid #333;
+    box-shadow: 0 0 10px rgba(0,0,0,0.4);
 }
 
 .card .label {
-    font-size: 12px;
-    opacity: 0.7;
+    font-size: 13px;
+    opacity: 0.75;
 }
 
 .card .value {
-    font-size: 22px;
+    font-size: 26px;
+    font-weight: bold;
     margin-top: 6px;
 }
 
-/* Status colors */
+/* Status colors (oude stijl) */
 .card.ok {
     border-color: #2ecc71;
+    box-shadow: 0 0 10px rgba(46, 204, 113, 0.4);
 }
 
 .card.warning {
     border-color: #f1c40f;
+    box-shadow: 0 0 10px rgba(241, 196, 15, 0.4);
 }
 
 .card.danger {
     border-color: #e74c3c;
+    box-shadow: 0 0 10px rgba(231, 76, 60, 0.4);
 }
 
 .card.loading .value {
@@ -143,24 +158,29 @@ button {
 }
 
 /* ----------------------------------------------------
-   TABLES
+   TABLES (oude stijl)
 ---------------------------------------------------- */
 .data-table {
     width: 100%;
     margin-top: 20px;
     border-collapse: collapse;
-    background: #1b1b1b;
+    background: #141414;
 }
 
 .data-table th,
 .data-table td {
     border: 1px solid #333;
     padding: 6px 8px;
-    text-align: left;
 }
 
 .data-table th {
     background: #222;
+    color: #eee;
+}
+
+.data-table td {
+    background: #1a1a1a;
+    color: #ddd;
 }
 
 .danger-row {
