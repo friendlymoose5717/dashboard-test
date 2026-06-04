@@ -375,4 +375,157 @@ async function getHP(acc) {
 async function getDelegatedHP(acc) {
     const g = await loadGlobals();
     const fund = parseFloat(g.total_vesting_fund_hive);
-    const shares
+    const shares = parseFloat(g.total_vesting_shares);
+    const ds = parseFloat(acc.delegated_vesting_shares);
+    return ds * (fund / shares);
+}
+
+// ----------------------------------------------------
+// HISTORY (30 DAYS)
+// ----------------------------------------------------
+async function getHistory30d(user) {
+    const limit = 1000;
+    let from = -1;
+    const cutoff = daysAgo(30);
+    const all = [];
+
+    while (true) {
+        const batch = await api("condenser_api.get_account_history", [user, from, limit]);
+        if (!batch?.length) break;
+
+        for (const h of batch) {
+            const ts = new Date(h[1].timestamp).getTime();
+            if (ts < cutoff) return all;
+            all.push(h);
+        }
+        from = batch[0][0] - 1;
+    }
+    return all;
+}
+
+// ----------------------------------------------------
+// METRICS
+// ----------------------------------------------------
+function postsComments7d(history, user) {
+    const cutoff = daysAgo(7);
+    let posts = 0, comments = 0;
+    const seenPermlinks = new Set();
+
+    for (const h of history) {
+        const op = h[1].op;
+        if (!op || op[0] !== "comment") continue;
+
+        const c = op[1];
+        if (c.author.toLowerCase() !== user) continue;
+
+        const ts = new Date(h[1].timestamp).getTime();
+        if (ts < cutoff) continue;
+
+        if (seenPermlinks.has(c.permlink)) continue;
+        seenPermlinks.add(c.permlink);
+
+        const isPost =
+            c.parent_author === "" &&
+            c.title.trim().length > 0 &&
+            !c.permlink.startsWith("re-");
+
+        if (isPost) posts++;
+        else comments++;
+    }
+
+    return { posts, comments, ratio: posts ? comments / posts : 0 };
+}
+
+function downvotes(history, user) {
+    const cutoff = daysAgo(30);
+    const map = {};
+
+    for (const h of history) {
+        const op = h[1].op;
+        if (!op || op[0] !== "vote") continue;
+
+        const v = op[1];
+        const ts = new Date(h[1].timestamp).getTime();
+        if (ts < cutoff) continue;
+
+        if (v.weight < 0 && v.author.toLowerCase() === user) {
+            map[v.voter] = (map[v.voter] || 0) + 1;
+        }
+    }
+    return map;
+}
+
+function uniqueUpvotedAuthors(history, user) {
+    const cutoff = daysAgo(30);
+    const authors = new Set();
+
+    for (const h of history) {
+        const op = h[1].op;
+        if (!op || op[0] !== "vote") continue;
+
+        const v = op[1];
+        const ts = new Date(h[1].timestamp).getTime();
+        if (ts < cutoff) continue;
+
+        if (!v.author || v.author.trim() === "") continue;
+
+        if (v.voter.toLowerCase() === user && v.weight > 0) {
+            authors.add(v.author.toLowerCase());
+        }
+    }
+
+    return authors.size;
+}
+
+// ----------------------------------------------------
+// TRANSFERS
+// ----------------------------------------------------
+function outgoingTransfers(history, user) {
+    return history
+        .filter(h => h[1].op[0] === "transfer")
+        .map(h => h[1].op[1])
+        .filter(t => t.from.toLowerCase() === user);
+}
+
+function summarizeTransfers(list) {
+    let hive = 0, hbd = 0;
+    const perUser = {};
+
+    for (const t of list) {
+        const [amt, cur] = t.amount.split(" ");
+        const v = parseFloat(amt);
+
+        if (cur === "HIVE") hive += v;
+        if (cur === "HBD") hbd += v;
+
+        if (!perUser[t.to]) perUser[t.to] = { hive: 0, hbd: 0 };
+        if (cur === "HIVE") perUser[t.to].hive += v;
+        if (cur === "HBD") perUser[t.to].hbd += v;
+    }
+    return { hive, hbd, perUser };
+}
+
+// ----------------------------------------------------
+// KE — KRAMPUS EFFICIENCY
+// ----------------------------------------------------
+async function computeKE(acc) {
+    const g = await loadGlobals();
+
+    const authorRewards = acc.posting_rewards / 1000;
+    const curationRewards = acc.curation_rewards / 1000;
+
+    const fund = parseFloat(g.total_vesting_fund_hive);
+    const shares = parseFloat(g.total_vesting_shares);
+    const vesting = parseFloat(acc.vesting_shares);
+
+    const hpBalance = shares ? (fund * vesting) / shares : 0;
+
+    const krampus = hpBalance ? (authorRewards + curationRewards) / hpBalance : -1;
+
+    return { authorRewards, curationRewards, hpBalance, krampus };
+}
+
+// ----------------------------------------------------
+// MAIN
+// ----------------------------------------------------
+async function checkUser() {
