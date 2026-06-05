@@ -38,7 +38,7 @@ const TOOLTIPS = {
   uniqueUpvotesCard: "Unique authors you upvoted in the last 30 days."
 };
 
-// Human‑readable labels for settings panel
+// Human‑readable labels
 const BLOCK_LABELS = {
   repCard: "Reputation",
   ageCard: "Account age (days)",
@@ -62,14 +62,13 @@ const api = (method, params = []) =>
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ jsonrpc: "2.0", method, params, id: 1 })
-  })
-    .then(r => r.json())
-    .then(j => j.result);
+  }).then(r => r.json()).then(j => j.result);
 
 const daysAgo = d => Date.now() - d * 86400000;
 
 const setCard = (id, value, status) => {
   const el = document.getElementById(id);
+  if (!el) return;
   el.querySelector(".value").innerHTML = value;
   el.className = "card " + status;
 };
@@ -96,7 +95,7 @@ const BLOCKS = [
 ];
 
 // ----------------------------------------------------
-// LOGOUT FUNCTION
+// LOGOUT
 // ----------------------------------------------------
 function logoutUser() {
   loggedInUser = null;
@@ -135,7 +134,6 @@ async function loginWithKeychain() {
         document.getElementById("loginStatus").innerHTML =
           "Logged in as @" + loggedInUser;
 
-        // Change button to logout
         const btn = document.getElementById("kcLoginBtn");
         btn.innerHTML = "Keychain Logout";
         btn.onclick = logoutUser;
@@ -151,7 +149,7 @@ async function loginWithKeychain() {
 }
 
 // ----------------------------------------------------
-// LOAD USER PREFERENCES
+// LOAD USER PREFS
 // ----------------------------------------------------
 async function loadUserPreferences() {
   if (!loggedInUser) {
@@ -172,13 +170,13 @@ async function loadUserPreferences() {
         const data = JSON.parse(op[1].json);
         userPreferences = data.prefs || { hiddenBlocks: [] };
         return;
-      } catch (e) {}
+      } catch {}
     }
   }
 }
 
 // ----------------------------------------------------
-// SAVE USER PREFERENCES
+// SAVE PREFS
 // ----------------------------------------------------
 async function saveUserPreferences() {
   if (!loggedInUser) {
@@ -186,16 +184,14 @@ async function saveUserPreferences() {
     return;
   }
 
-  const json = {
-    app: "hive-account-health-dashboard",
-    prefs: userPreferences
-  };
-
   hive_keychain.requestCustomJson(
     loggedInUser,
     "hive-dashboard-prefs",
     "Posting",
-    JSON.stringify(json),
+    JSON.stringify({
+      app: "hive-account-health-dashboard",
+      prefs: userPreferences
+    }),
     "Save dashboard preferences",
     (res) => {
       if (!res.success) alert("Failed to save preferences.");
@@ -211,7 +207,7 @@ function renderSettingsPanel() {
   const content = document.getElementById("settingsContent");
   panel.style.display = "block";
 
-  // Add close button (X)
+  // Add close button
   if (!document.getElementById("settingsCloseBtn")) {
     const x = document.createElement("button");
     x.id = "settingsCloseBtn";
@@ -225,11 +221,6 @@ function renderSettingsPanel() {
     x.style.cursor = "pointer";
     x.onclick = () => panel.style.display = "none";
     panel.appendChild(x);
-  }
-
-  if (!loggedInUser) {
-    content.innerHTML = `<p>Settings can only be saved when logged in.</p>`;
-    return;
   }
 
   content.innerHTML = BLOCKS.map(id => `
@@ -255,7 +246,6 @@ function renderSettingsPanel() {
 
   applyBlockVisibility();
 }
-
 // ----------------------------------------------------
 // APPLY VISIBILITY
 // ----------------------------------------------------
@@ -297,6 +287,24 @@ async function logLogin(username) {
     );
   } catch {}
 }
+
+// ----------------------------------------------------
+// INITIAL EMPTY CARDS (fix for hiding before search)
+// ----------------------------------------------------
+window.addEventListener("DOMContentLoaded", () => {
+  const dash = document.getElementById("dashboard");
+  dash.innerHTML = `
+    <div class="grid">
+      ${BLOCKS.map(id => `
+        <div class="card" id="${id}">
+          <div class="label">${BLOCK_LABELS[id]}</div>
+          <div class="value">—</div>
+        </div>
+      `).join("")}
+    </div>
+  `;
+  applyBlockVisibility();
+});
 
 // ----------------------------------------------------
 // EVENTS
