@@ -226,6 +226,25 @@ function renderSettingsPanel() {
   const content = document.getElementById("settingsContent");
   panel.style.display = "block";
 
+  // Add close button (X) once
+  let closeBtn = document.getElementById("settingsCloseBtn");
+  if (!closeBtn) {
+    closeBtn = document.createElement("button");
+    closeBtn.id = "settingsCloseBtn";
+    closeBtn.innerHTML = "×";
+    closeBtn.style.position = "absolute";
+    closeBtn.style.top = "8px";
+    closeBtn.style.right = "8px";
+    closeBtn.style.border = "none";
+    closeBtn.style.background = "transparent";
+    closeBtn.style.fontSize = "20px";
+    closeBtn.style.cursor = "pointer";
+    closeBtn.addEventListener("click", () => {
+      panel.style.display = "none";
+    });
+    panel.appendChild(closeBtn);
+  }
+
   if (!loggedInUser) {
     content.innerHTML = `<p>Settings can only be saved when logged in with your Hive account.</p>`;
     return;
@@ -788,6 +807,13 @@ document
 document
   .getElementById("kcLoginBtn")
   .addEventListener("click", loginWithKeychain);
+
+// Enter in Keychain username field triggers Keychain login
+document
+  .getElementById("loginUserInput")
+  .addEventListener("keydown", e => {
+    if (e.key === "Enter") loginWithKeychain();
+  });
 
 document
   .getElementById("settingsBtn")
